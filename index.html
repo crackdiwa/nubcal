@@ -147,7 +147,7 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2.5px soli
 .meal-head .m-kcal{font-family:var(--font-num);font-size:.85rem;color:var(--muted);font-weight:600}
 .entry{background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow);padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:8px}
 .entry .e-ico{width:38px;height:38px;border-radius:12px;background:var(--green-fade);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
-.entry .e-body{flex:1;min-width:0}
+.entry .e-body{flex:1;min-width:0;text-align:left;padding:0;cursor:pointer}
 .entry .e-name{font-weight:600;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .entry .e-sub{font-size:.78rem;color:var(--muted)}
 .entry .e-kcal{font-family:var(--font-num);font-weight:700;color:var(--green);font-size:1rem;flex-shrink:0}
@@ -220,7 +220,16 @@ details.howto a{color:var(--green-mid);font-weight:600}
 .qty{display:flex;align-items:center;gap:2px;background:var(--green-fade);border-radius:999px;padding:3px}
 .qty button{width:30px;height:30px;border-radius:50%;background:#fff;font-weight:800;color:var(--green);font-size:1.05rem;box-shadow:0 1px 4px rgba(0,0,0,.08)}
 .qty .qv{min-width:44px;text-align:center;font-family:var(--font-num);font-weight:700;font-size:.9rem}
-.ci-remove{color:#B9C4BC;font-size:.8rem;font-weight:600;margin-top:6px}
+.ci-remove{color:#B9C4BC;font-size:.8rem;font-weight:600}
+.ci-actions{display:flex;gap:16px;margin-top:8px;align-items:center}
+.ci-edit{color:var(--green-mid);font-size:.8rem;font-weight:700}
+.ci-form{margin-top:10px;border-top:1.5px dashed var(--line);padding-top:10px}
+.ci-form .field{margin-bottom:8px}
+.ci-form .field label{font-size:.78rem;margin-bottom:3px}
+.ci-form input{padding:9px 10px;font-size:.92rem}
+.ci-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.ci-hint{font-size:.75rem;color:var(--muted);margin-top:2px}
+.add-custom{width:100%;margin-top:12px;padding:12px;border:1.5px dashed var(--green-mid);border-radius:var(--r-md);color:var(--green);font-weight:700;background:var(--green-fade);font-size:.95rem}
 .meal-pick{display:flex;gap:8px;margin:12px 0}
 .meal-pick .chip{padding:8px 6px;font-size:.85rem}
 
@@ -428,6 +437,7 @@ details.howto a{color:var(--green-mid);font-weight:600}
       </div>
       <div id="food-results"></div>
       <button class="ai-cta hidden" id="ai-text-btn" type="button">✨ ให้ AI ประเมิน "<span id="ai-text-q"></span>"</button>
+      <button class="add-custom" id="custom-btn" type="button">➕ กรอกค่าเอง — รู้แคล/โปรตีนอยู่แล้ว พิมพ์เองได้เลย</button>
     </div>
   </div>
 
@@ -924,7 +934,7 @@ function renderHome(){
       <div class="meal-head"><span class="sec-title">${MEAL_ICONS[m]} ${MEALS[m]}</span><span class="m-kcal">${gk.toLocaleString()} แคล</span></div>
       ${es.map(e => `<div class="entry">
         <span class="e-ico">${e.src==="photo"?"📷":e.src==="scan"?"🏷️":e.src==="ai"?"✨":"🍽️"}</span>
-        <span class="e-body"><span class="e-name">${esc(e.name)}</span><br/><span class="e-sub">${e.qty!==1?("×"+e.qty+" · "):""}${esc(e.portion||"")} · โปรตีน ${r1(e.p*e.qty)} ก.</span></span>
+        <button class="e-body" data-edit="${e.id}" type="button" aria-label="แก้ไขรายการ"><span class="e-name">${esc(e.name)}</span><br/><span class="e-sub">${e.qty!==1?("×"+e.qty+" · "):""}${esc(e.portion||"")} · โปรตีน ${r1(e.p*e.qty)} ก.</span></button>
         <span class="e-kcal">${Math.round(e.k*e.qty)}<small> แคล</small></span>
         <button class="e-del" data-del="${e.id}" aria-label="ลบรายการ"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
       </div>`).join("")}
@@ -1034,6 +1044,10 @@ function bindHomeDeletes(dk, entries){
     log[dk] = (log[dk]||[]).filter(e=>e.id!==b.dataset.del);
     if(!log[dk].length) delete log[dk];
     saveLog(log); renderHome(); toast("ลบแล้ว");
+  });
+  $$("#view-home [data-edit]").forEach(b => b.onclick = ()=>{
+    const entry = entries.find(e=>e.id===b.dataset.edit);
+    if(entry) openEntryEditor(dk, entry);
   });
 }
 
@@ -1389,20 +1403,36 @@ async function lookupEAN(code){
 
 /* ================= confirm sheet ================= */
 function openConfirm(items, title, note){
+  S.editing = null;
   S.pending = items;
   S.pendingMeal = mealByHour(new Date().getHours());
   $("#confirm-title").textContent = title;
   $("#confirm-note").textContent = note;
+  $("#confirm-save").textContent = "บันทึกลงวันนี้";
   renderConfirmItems();
   $$("#meal-chips .chip").forEach(c => c.classList.toggle("on", c.dataset.v===S.pendingMeal));
   openSheet("#sheet-confirm");
 }
+/* แตะรายการที่บันทึกแล้ว → เปิดมาแก้ทุกค่าได้ */
+function openEntryEditor(dk, entry){
+  S.editing = {dk, id: entry.id};
+  S.pending = [{name:entry.name, portion:entry.portion||"", qty:entry.qty, src:entry.src,
+    k:entry.k, p:entry.p, c:entry.c, f:entry.f, na:entry.na, s:entry.s, open:true}];
+  S.pendingMeal = entry.meal;
+  $("#confirm-title").textContent = "แก้ไขรายการ";
+  $("#confirm-note").textContent = "ปรับได้ทุกช่อง เสร็จแล้วกดบันทึก";
+  $("#confirm-save").textContent = "บันทึกการแก้ไข";
+  renderConfirmItems();
+  $$("#meal-chips .chip").forEach(c => c.classList.toggle("on", c.dataset.v===S.pendingMeal));
+  openSheet("#sheet-confirm");
+}
+const NUT_FIELDS = [["k","แคล"],["p","โปรตีน (ก.)"],["c","คาร์บ (ก.)"],["f","ไขมัน (ก.)"],["na","โซเดียม (มก.)"],["s","น้ำตาล (ก.)"]];
 function renderConfirmItems(){
   $("#confirm-items").innerHTML = S.pending.map((it,i)=>`
     <div class="ci-item">
       <div class="ci-top">
         <div style="min-width:0">
-          <div class="ci-name">${esc(it.name)}</div>
+          <div class="ci-name">${esc(it.name)||'<span style="color:var(--muted);font-weight:500">ยังไม่มีชื่อ — กรอกด้านล่าง</span>'}</div>
           <div class="ci-portion">${esc(it.portion||"")}</div>
         </div>
         <div class="qty">
@@ -1419,7 +1449,18 @@ function renderConfirmItems(){
         <span>โซเดียม <b>${Math.round(it.na*it.qty)}</b></span>
         <span>น้ำตาล <b>${r1(it.s*it.qty)}</b></span>
       </div>
-      ${S.pending.length>1?`<button class="ci-remove" data-rm="${i}" type="button">เอารายการนี้ออก</button>`:""}
+      <div class="ci-actions">
+        <button class="ci-edit" data-ed="${i}" type="button">${it.open?"ซ่อนช่องแก้ไข":"✏️ แก้ไขค่าเอง"}</button>
+        ${S.pending.length>1?`<button class="ci-remove" data-rm="${i}" type="button">เอารายการนี้ออก</button>`:""}
+      </div>
+      ${it.open?`<div class="ci-form">
+        <div class="field"><label>ชื่ออาหาร</label><input type="text" data-i="${i}" data-f="name" maxlength="60" placeholder="เช่น ข้าวกล่องอกไก่" value="${esc(it.name)}"/></div>
+        <div class="field"><label>ปริมาณ/หน่วย</label><input type="text" data-i="${i}" data-f="portion" maxlength="30" placeholder="เช่น 1 จาน, 100 ก." value="${esc(it.portion||"")}"/></div>
+        <div class="ci-grid">
+          ${NUT_FIELDS.map(([f,lbl])=>`<div class="field"><label>${lbl}</label><input type="number" min="0" step="any" inputmode="decimal" data-i="${i}" data-f="${f}" value="${it[f]||0}"/></div>`).join("")}
+        </div>
+        <p class="ci-hint">ค่าต่อ 1 หน่วย — ถ้ากินมากกว่า 1 หน่วย ใช้ปุ่ม − / + ด้านบน</p>
+      </div>`:""}
     </div>`).join("");
   $$("#confirm-items [data-q]").forEach(b => b.onclick = ()=>{
     const it = S.pending[+b.dataset.i];
@@ -1427,6 +1468,19 @@ function renderConfirmItems(){
     renderConfirmItems();
   });
   $$("#confirm-items [data-rm]").forEach(b => b.onclick = ()=>{ S.pending.splice(+b.dataset.rm,1); renderConfirmItems(); });
+  $$("#confirm-items [data-ed]").forEach(b => b.onclick = ()=>{
+    const it = S.pending[+b.dataset.ed];
+    it.open = !it.open;
+    renderConfirmItems();
+  });
+  $$("#confirm-items .ci-form input").forEach(inp => {
+    inp.addEventListener("input", ()=>{
+      const it = S.pending[+inp.dataset.i], f = inp.dataset.f;
+      if(f==="name" || f==="portion") it[f] = inp.value;
+      else it[f] = Math.max(0, parseFloat(inp.value) || 0);
+    });
+    inp.addEventListener("change", ()=>renderConfirmItems()); // refresh ตัวเลขสรุปตอนออกจากช่อง
+  });
 }
 $("#meal-chips").addEventListener("click", e => {
   const c = e.target.closest(".chip"); if(!c) return;
@@ -1435,16 +1489,36 @@ $("#meal-chips").addEventListener("click", e => {
 });
 $("#confirm-save").onclick = ()=>{
   if(!S.pending.length){ closeSheet("#sheet-confirm"); return; }
+  S.pending.forEach(it => { if(!String(it.name).trim()) it.name = "อาหารของฉัน"; });
   const log = getLog();
+  if(S.editing){
+    const arr = log[S.editing.dk] || [];
+    const i = arr.findIndex(e => e.id === S.editing.id);
+    if(i > -1){
+      const {open, ...vals} = S.pending[0];
+      arr[i] = {...arr[i], ...vals, meal:S.pendingMeal};
+      saveLog(log);
+    }
+    S.editing = null; S.pending = [];
+    closeSheet("#sheet-confirm");
+    switchView("home");
+    toast("แก้ไขแล้ว");
+    return;
+  }
   const dk = dateKey(S.curDate);
   log[dk] = log[dk] || [];
-  S.pending.forEach(it => log[dk].push({id:uid(), ts:Date.now(), meal:S.pendingMeal, ...it}));
+  S.pending.forEach(it => { const {open, ...vals} = it; log[dk].push({id:uid(), ts:Date.now(), meal:S.pendingMeal, ...vals}); });
   saveLog(log);
   const addK = Math.round(S.pending.reduce((a,it)=>a+it.k*it.qty,0));
   closeSheet("#sheet-confirm");
   S.pending = [];
   switchView("home");
   toast(`บันทึกแล้ว +${addK.toLocaleString()} แคล`);
+};
+$("#custom-btn").onclick = ()=>{
+  closeSheet("#sheet-manual");
+  openConfirm([{name:"", portion:"1 ที่", qty:1, k:0, p:0, c:0, f:0, na:0, s:0, src:"manual", open:true}],
+    "กรอกค่าอาหารเอง", "รู้ค่าไหนใส่ค่านั้น ที่เหลือปล่อย 0 ได้");
 };
 
 /* ================= boot ================= */
