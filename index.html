@@ -127,6 +127,20 @@ input:focus-visible,select:focus-visible,button:focus-visible{outline:2.5px soli
 .limit-chip.over{background:var(--chili-soft)}
 .limit-chip.over b{color:var(--chili)}
 
+/* ===== predict & diary ===== */
+.predict{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:14px 16px;margin-top:14px;display:flex;gap:12px;align-items:flex-start;font-size:.92rem}
+.predict .p-ico{width:40px;height:40px;border-radius:12px;background:var(--green-fade);display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0}
+.predict b{font-family:var(--font-num);color:var(--green)}
+.predict.warn b{color:var(--chili)}
+.predict .p-sub{font-size:.78rem;color:var(--muted);margin-top:2px}
+.predict button{color:var(--green-mid);font-weight:700;font-size:.88rem;padding:0;text-decoration:underline}
+.diary{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:16px;margin-top:14px}
+.diary-row{display:flex;gap:10px;margin-bottom:10px}
+.diary-row .field{flex:1;margin-bottom:0}
+.diary-row .field.w{flex:0 0 118px}
+.diary .btn{padding:11px}
+.diary .saved{font-size:.8rem;color:var(--green-mid);font-weight:700;margin-left:8px}
+
 /* ===== meals ===== */
 .meal-group{margin-top:16px}
 .meal-head{display:flex;justify-content:space-between;align-items:baseline;padding:0 4px 6px}
@@ -299,6 +313,11 @@ details.howto a{color:var(--green-mid);font-weight:600}
           <div class="field"><label for="f-age">อายุ (ปี)</label><input type="number" id="f-age" min="10" max="100" inputmode="numeric" required/></div>
           <div class="field"><label for="f-weight">น้ำหนัก (กก.)</label><input type="number" id="f-weight" min="25" max="300" step="0.1" inputmode="decimal" required/></div>
           <div class="field"><label for="f-height">ส่วนสูง (ซม.)</label><input type="number" id="f-height" min="100" max="250" inputmode="numeric" required/></div>
+        </div>
+        <div class="field">
+          <label for="f-target">น้ำหนักเป้าหมาย (กก.)</label>
+          <input type="number" id="f-target" min="25" max="300" step="0.1" inputmode="decimal" placeholder="เช่น 70"/>
+          <div class="hint">ใส่ไว้ แอพจะคาดการณ์ให้ว่าจะถึงเป้าเมื่อไหร่ (เว้นว่างได้)</div>
         </div>
       </div>
       <div class="setup-card">
@@ -659,6 +678,39 @@ const logKey = () => "nc_log_" + S.user.id;
 const getLog = () => lsGet(logKey(), {});
 const saveLog = l => lsSet(logKey(), l);
 const getKey = () => lsGet("nc_gemini_key", "");
+const diaryKey = () => "nc_diary_" + S.user.id;
+const getDiary = () => lsGet(diaryKey(), {});
+const saveDiary = d => lsSet(diaryKey(), d);
+
+/* บันทึกน้ำหนักเรียงตามวัน */
+function weightLogs(){
+  const d = getDiary();
+  return Object.keys(d).filter(k => +d[k].w > 0).sort().map(k => ({dk:k, w:+d[k].w}));
+}
+/* คาดการณ์ว่าจะถึงน้ำหนักเป้าหมายเมื่อไหร่
+   - มีบันทึกน้ำหนักจริง ≥2 ครั้ง ห่างกัน ≥7 วัน → ใช้อัตราจริง
+   - ไม่งั้นใช้อัตราตามแผน (adj แคล/วัน ÷ 7700 ต่อ กก.) */
+function predictGoal(){
+  const pf = S.user.profile, T = S.targets;
+  const target = +pf.target || 0;
+  const logs = weightLogs();
+  const curW = logs.length ? logs[logs.length-1].w : +pf.weight;
+  if(!target) return {type:"notarget"};
+  const diff = target - curW;
+  if(Math.abs(diff) < 0.5) return {type:"reached", curW, target};
+  let rate = null, basis = "plan";
+  if(logs.length >= 2){
+    const days = (new Date(logs[logs.length-1].dk) - new Date(logs[0].dk)) / 86400000;
+    if(days >= 7){ rate = (logs[logs.length-1].w - logs[0].w)/days*7; basis = "actual"; }
+  }
+  if(rate === null){
+    if(T.adj === 0) return {type:"maintain", curW, target};
+    rate = T.adj*7/7700;
+  }
+  if(Math.abs(rate) < 0.02) return {type:"stalled", basis, curW, target};
+  if(Math.sign(rate) !== Math.sign(diff)) return {type:"wrongway", basis, curW, target};
+  return {type:"eta", weeks:diff/rate, rate, basis, curW, target};
+}
 
 /* ================= auth ================= */
 let authMode = "login";
@@ -720,11 +772,12 @@ function bindChipGroup(groupId, key){
   });
 }
 bindChipGroup("sex-chips","sex"); bindChipGroup("act-chips","act"); bindChipGroup("goal-chips","goal");
-["f-age","f-weight","f-height"].forEach(id => $("#"+id).addEventListener("input", previewTargets));
+["f-age","f-weight","f-height","f-target"].forEach(id => $("#"+id).addEventListener("input", previewTargets));
 function readSetupForm(){
   const age = +$("#f-age").value, weight = +$("#f-weight").value, height = +$("#f-height").value;
+  const target = +$("#f-target").value || 0;
   if(!setupSel.sex || !setupSel.act || !setupSel.goal || !age || !weight || !height) return null;
-  return { sex:setupSel.sex, act:setupSel.act, goal:setupSel.goal, age, weight, height };
+  return { sex:setupSel.sex, act:setupSel.act, goal:setupSel.goal, age, weight, height, target };
 }
 function previewTargets(){
   const pf = readSetupForm();
@@ -742,7 +795,24 @@ function previewTargets(){
     <div class="tp-row"><span>คาร์บ</span><b>${t.carb} ก.</b></div>
     <div class="tp-row"><span>ไขมัน</span><b>${t.fat} ก.</b></div>
     <div class="tp-row"><span>โซเดียมไม่เกิน</span><b>${t.sodium.toLocaleString()} มก.</b></div>
-    <div class="tp-row"><span>น้ำตาลไม่เกิน</span><b>${t.sugar} ก.</b></div>`;
+    <div class="tp-row"><span>น้ำตาลไม่เกิน</span><b>${t.sugar} ก.</b></div>
+    ${planEtaText(pf, t) ? `<div class="tp-row"><span>ถึง ${pf.target} กก. ประมาณ</span><b>${planEtaText(pf, t)}</b></div>` : ""}`;
+}
+// คาดการณ์ตามแผน: 7700 แคล ≈ ไขมัน 1 กก.
+function planEtaText(pf, t){
+  if(!pf.target || t.adj===0) return "";
+  const diff = pf.target - pf.weight;
+  const rate = t.adj*7/7700; // กก./สัปดาห์ (มีเครื่องหมาย)
+  if(Math.abs(diff) < 0.5 || Math.sign(diff) !== Math.sign(rate)) return "";
+  return fmtWeeks(diff/rate);
+}
+function fmtWeeks(weeks){
+  const eta = new Date(); eta.setDate(eta.getDate() + Math.round(weeks*7));
+  const when = eta.toLocaleDateString("th-TH",{month:"short",year:"numeric"});
+  if(weeks > 104) return "เกิน 2 ปี";
+  if(weeks < 1.5) return "ประมาณ 1 สัปดาห์";
+  if(weeks < 10) return `~${Math.round(weeks)} สัปดาห์ (${when})`;
+  return `~${Math.round(weeks/4.345)} เดือน (${when})`;
 }
 function showSetup(editing){
   $("#scr-app").classList.add("hidden");
@@ -752,6 +822,7 @@ function showSetup(editing){
   const pf = S.user.profile;
   if(pf){
     $("#f-age").value = pf.age; $("#f-weight").value = pf.weight; $("#f-height").value = pf.height;
+    $("#f-target").value = pf.target || "";
     setupSel.sex = pf.sex; setupSel.act = pf.act; setupSel.goal = pf.goal;
     $$("#sex-chips .chip").forEach(c => c.classList.toggle("on", c.dataset.v===pf.sex));
     $$("#act-chips .chip").forEach(c => c.classList.toggle("on", c.dataset.v===pf.act));
@@ -891,8 +962,71 @@ function renderHome(){
         <div class="limit-chip${tot.s>T.sugar?" over":""}">น้ำตาล<b>${r1(tot.s)} / ${T.sugar} ก.</b></div>
       </div>
     </div>
+    ${predictCard()}
+    ${diaryCard(dk)}
     ${entries.length ? groups : `<div class="empty"><div class="big">🍚</div>ยังไม่มีรายการของ${isToday?"วันนี้":"วันนั้น"}<br/>กดปุ่ม <b style="color:var(--chili)">+</b> เพื่อเพิ่มมื้อแรก</div>`}
   `;
+  const dyBtn = $("#dy-save");
+  if(dyBtn) dyBtn.onclick = ()=>saveDiaryEntry(dk);
+  const pfGoalBtn = $("#predict-set");
+  if(pfGoalBtn) pfGoalBtn.onclick = ()=>showSetup(true);
+  bindHomeDeletes(dk, entries);
+}
+function predictCard(){
+  const p = predictGoal();
+  const icon = t => `<span class="p-ico">${t}</span>`;
+  if(p.type==="notarget")
+    return `<div class="predict">${icon("🎯")}<span>อยากรู้ว่าอีกนานแค่ไหนจะถึงเป้า?<br/><button type="button" id="predict-set">ตั้งน้ำหนักเป้าหมาย</button></span></div>`;
+  if(p.type==="reached")
+    return `<div class="predict">${icon("🎉")}<span>ถึงเป้า <b>${p.target} กก.</b> แล้ว! รักษาไว้แบบนี้ต่อไป<div class="p-sub">ตอนนี้ ${p.curW} กก.</div></span></div>`;
+  if(p.type==="maintain")
+    return `<div class="predict">${icon("⚖️")}<span>โหมดรักษาน้ำหนัก — ตอนนี้ <b>${p.curW} กก.</b><div class="p-sub">จดน้ำหนักด้านล่างทุกวัน จะเห็นแนวโน้มชัดขึ้น</div></span></div>`;
+  if(p.type==="stalled")
+    return `<div class="predict warn">${icon("😴")}<span>น้ำหนักช่วงนี้นิ่งอยู่ที่ <b>${p.curW} กก.</b><div class="p-sub">ลองเช็คว่าแต่ละวันกินตามเป้าจริงไหม</div></span></div>`;
+  if(p.type==="wrongway")
+    return `<div class="predict warn">${icon("🙈")}<span>น้ำหนักช่วงนี้ยังสวนทางเป้า (ตอนนี้ <b>${p.curW}</b> → เป้า <b>${p.target} กก.</b>)<div class="p-sub">ไม่เป็นไร กลับมาตามแผนวันนี้ได้เลย</div></span></div>`;
+  const sub = p.basis==="actual"
+    ? `คิดจากน้ำหนักจริงที่จดไว้ (${p.rate>0?"+":""}${r1(p.rate)} กก./สัปดาห์)`
+    : `คิดตามแผน ${S.targets.adj>0?"+":""}${S.targets.adj} แคล/วัน — จดน้ำหนักทุกวัน แอพจะคำนวณจากผลจริงให้แม่นขึ้น`;
+  return `<div class="predict">${icon("🎯")}<span>จะถึง <b>${p.target} กก.</b> ${fmtWeeks(p.weeks)}<div class="p-sub">${sub}</div></span></div>`;
+}
+function diaryCard(dk){
+  const d = getDiary()[dk] || {};
+  const has = d.w || d.note;
+  return `<div class="diary">
+    <h3 class="sec-title" style="margin-bottom:12px">📝 บันทึกประจำวัน${has?'<span class="saved">✓ จดแล้ว</span>':""}</h3>
+    <div class="diary-row">
+      <div class="field w"><label for="dy-w">น้ำหนัก (กก.)</label><input type="number" id="dy-w" step="0.1" min="25" max="300" inputmode="decimal" value="${d.w||""}"/></div>
+      <div class="field"><label for="dy-note">โน้ตสั้น ๆ</label><input type="text" id="dy-note" maxlength="120" placeholder="เช่น วิ่ง 3 กม. / นอนดึก" value="${esc(d.note||"")}"/></div>
+    </div>
+    <button class="btn btn-ghost" id="dy-save" type="button">${has?"อัปเดตบันทึก":"บันทึก"}</button>
+  </div>`;
+}
+function saveDiaryEntry(dk){
+  const w = +$("#dy-w").value || 0;
+  const note = $("#dy-note").value.trim();
+  if($("#dy-w").value && (w < 25 || w > 300)){ toast("น้ำหนักดูแปลก ๆ ลองเช็คอีกที"); return; }
+  const diary = getDiary();
+  if(!w && !note){ delete diary[dk]; saveDiary(diary); renderHome(); toast("ลบบันทึกของวันนี้แล้ว"); return; }
+  diary[dk] = {w, note};
+  saveDiary(diary);
+  let msg = "จดบันทึกแล้ว";
+  const logs = weightLogs();
+  if(logs.length){
+    const latest = logs[logs.length-1].w;
+    if(latest !== +S.user.profile.weight){
+      S.user.profile.weight = latest;
+      const users = getUsers();
+      const i = users.findIndex(u=>u.id===S.user.id);
+      if(i>-1){ users[i] = S.user; saveUsers(users); }
+      S.targets = calcTargets(S.user.profile);
+      msg = `จดแล้ว อัปเดตน้ำหนักเป็น ${latest} กก. และคำนวณเป้าใหม่ให้`;
+    }
+  }
+  renderHome();
+  toast(msg);
+}
+function bindHomeDeletes(dk, entries){
   $$("#view-home [data-del]").forEach(b => b.onclick = async ()=>{
     const entry = entries.find(e=>e.id===b.dataset.del);
     if(!(await askConfirm("ลบรายการนี้?", `"${entry?entry.name:""}" จะถูกลบออกจากบันทึก`, "ลบ"))) return;
@@ -906,12 +1040,14 @@ function renderHome(){
 /* ================= history ================= */
 function renderHistory(){
   const T = S.targets, log = getLog(), N = S.histRange;
+  const diary = getDiary();
   const days = [];
   for(let i=N-1;i>=0;i--){
     const d = new Date(); d.setDate(d.getDate()-i);
     const dk = dateKey(d);
     const tot = dayTotals(dk);
-    days.push({dk, d, k:Math.round(tot.k), has:(log[dk]||[]).length>0});
+    const dyr = diary[dk];
+    days.push({dk, d, k:Math.round(tot.k), hasFood:(log[dk]||[]).length>0, has:(log[dk]||[]).length>0 || !!(dyr && (dyr.w || dyr.note))});
   }
   const maxK = Math.max(T.kcal*1.15, ...days.map(x=>x.k)) * 1.08;
   const W=320,H=150,base=130;
@@ -925,14 +1061,17 @@ function renderHistory(){
   }).join("");
   const ty = base - T.kcal/maxK*(base-16);
   const withData = days.filter(x=>x.has);
-  const avg = withData.length ? Math.round(withData.reduce((a,x)=>a+x.k,0)/withData.length) : 0;
-  const okDays = withData.filter(x=>x.k<=T.kcal).length;
+  const foodDays = days.filter(x=>x.hasFood);
+  const avg = foodDays.length ? Math.round(foodDays.reduce((a,x)=>a+x.k,0)/foodDays.length) : 0;
+  const okDays = foodDays.filter(x=>x.k<=T.kcal).length;
 
   const dayRows = [...withData].reverse().map(x=>{
     const over = x.k>T.kcal;
+    const dw = diary[x.dk];
+    const nItems = dayEntries(x.dk).length;
     return `<button class="day-row" data-day="${x.dk}">
-      <span><span class="d-date">${fmtDateTH(x.d)}</span><br/><span class="d-sub">${dayEntries(x.dk).length} รายการ</span></span>
-      <span class="d-kcal${over?" over":""}">${x.k.toLocaleString()} แคล</span>
+      <span><span class="d-date">${fmtDateTH(x.d)}</span><br/><span class="d-sub">${nItems?`${nItems} รายการ`:"ไม่ได้จดอาหาร"}${dw&&dw.w?` · ⚖️ ${dw.w} กก.`:""}${dw&&dw.note?` · 📝 ${esc(dw.note)}`:""}</span></span>
+      <span class="d-kcal${over?" over":""}">${x.hasFood?x.k.toLocaleString()+" แคล":"—"}</span>
     </button>`;
   }).join("");
 
@@ -948,9 +1087,10 @@ function renderHistory(){
         ${bars}
       </svg>
     </div>
+    ${weightChart(days)}
     <div class="stat-grid">
       <div class="stat"><div class="s-val">${avg.toLocaleString()}</div><div class="s-lbl">แคลเฉลี่ย/วัน (${N} วัน)</div></div>
-      <div class="stat"><div class="s-val">${okDays}/${withData.length||0}</div><div class="s-lbl">วันที่อยู่ในเป้า</div></div>
+      <div class="stat"><div class="s-val">${okDays}/${foodDays.length||0}</div><div class="s-lbl">วันที่อยู่ในเป้า</div></div>
     </div>
     <div style="margin-top:16px">${dayRows || `<div class="empty">ยังไม่มีข้อมูลย้อนหลัง<br/>เริ่มบันทึกวันนี้เลย</div>`}</div>
   `;
@@ -962,6 +1102,33 @@ function renderHistory(){
   });
 }
 
+/* กราฟแนวโน้มน้ำหนัก */
+function weightChart(days){
+  const target = +S.user.profile.target || 0;
+  const dmap = getDiary();
+  const pts = days.map((x,i)=>({i, w:(dmap[x.dk] && +dmap[x.dk].w > 0) ? +dmap[x.dk].w : null})).filter(p=>p.w);
+  if(pts.length < 2) return `<div class="chart-card" style="margin-top:14px"><h3 class="sec-title">น้ำหนัก</h3><p style="font-size:.85rem;color:var(--muted);margin:0">จดน้ำหนักในหน้า “วันนี้” อย่างน้อย 2 วัน แล้วกราฟแนวโน้มจะขึ้นตรงนี้</p></div>`;
+  const W=320,H=130,L=36,R=12,T2=16,B=10;
+  const ws = pts.map(p=>p.w);
+  let lo = Math.min(...ws, target||Infinity), hi = Math.max(...ws, target||-Infinity);
+  if(hi-lo < 2){ lo-=1; hi+=1; } else { lo-=0.5; hi+=0.5; }
+  const X = i => L + (W-L-R) * (days.length<=1 ? 0.5 : i/(days.length-1));
+  const Y = w => T2 + (H-T2-B) * (1 - (w-lo)/(hi-lo));
+  const path = pts.map((p,j)=>`${j?"L":"M"}${X(p.i).toFixed(1)},${Y(p.w).toFixed(1)}`).join("");
+  const dots = pts.map(p=>`<circle cx="${X(p.i).toFixed(1)}" cy="${Y(p.w).toFixed(1)}" r="3.2" fill="var(--green-mid)"/>`).join("");
+  const tLine = target ? `<line x1="${L}" y1="${Y(target).toFixed(1)}" x2="${W-R}" y2="${Y(target).toFixed(1)}" stroke="var(--chili)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".65"/><text x="${W-R}" y="${(Y(target)-4).toFixed(1)}" font-size="10" text-anchor="end" fill="var(--chili)" font-family="Prompt">เป้า ${target}</text>` : "";
+  return `<div class="chart-card" style="margin-top:14px">
+    <h3 class="sec-title">น้ำหนัก · ล่าสุด ${pts[pts.length-1].w} กก.</h3>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="กราฟแนวโน้มน้ำหนัก">
+      <text x="2" y="${(T2+4).toFixed(1)}" font-size="10" fill="#8A978E" font-family="Prompt">${r1(hi)}</text>
+      <text x="2" y="${(H-B).toFixed(1)}" font-size="10" fill="#8A978E" font-family="Prompt">${r1(lo)}</text>
+      ${tLine}
+      <path d="${path}" fill="none" stroke="var(--green-mid)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      ${dots}
+    </svg>
+  </div>`;
+}
+
 /* ================= profile view ================= */
 function renderProfile(){
   const pf = S.user.profile, T = S.targets;
@@ -971,6 +1138,7 @@ function renderProfile(){
       <h3>ข้อมูลร่างกาย</h3>
       <div class="pf-row"><span>เพศ / อายุ</span><b>${pf.sex==="m"?"ชาย":"หญิง"} · ${pf.age} ปี</b></div>
       <div class="pf-row"><span>น้ำหนัก / ส่วนสูง</span><b>${pf.weight} กก. · ${pf.height} ซม.</b></div>
+      <div class="pf-row"><span>น้ำหนักเป้าหมาย</span><b>${pf.target ? pf.target+" กก." : "ยังไม่ได้ตั้ง"}</b></div>
       <div class="pf-row"><span>กิจกรรม</span><b>${esc(ACTS[pf.act]||"")}</b></div>
       <div class="pf-row"><span>เป้าหมาย</span><b>${esc(T.goalLabel)}</b></div>
       <button class="btn btn-ghost" id="pf-edit" style="margin-top:12px">แก้ไขข้อมูล</button>
@@ -1017,6 +1185,7 @@ function renderProfile(){
   $("#pf-wipe").onclick = async ()=>{
     if(!(await askConfirm("ลบทุกอย่าง?", "บัญชีนี้และบันทึกอาหารทั้งหมดจะหายถาวร กู้คืนไม่ได้", "ลบถาวร"))) return;
     localStorage.removeItem(logKey());
+    localStorage.removeItem(diaryKey());
     saveUsers(getUsers().filter(u=>u.id!==S.user.id));
     logout();
     toast("ลบข้อมูลเรียบร้อย");
