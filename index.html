@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+<title>นับแคล — NubCal</title>
+<meta name="description" content="แอพนับแคลอรี่ภาษาไทย ถ่ายรูปอาหารให้ AI คำนวณแคล โปรตีน คาร์บ ไขมัน โซเดียม น้ำตาล"/>
+<meta name="theme-color" content="#1B4D33"/>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='46' fill='%231B4D33'/><text x='50' y='66' font-size='46' text-anchor='middle'>🍚</text></svg>"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Prompt:wght@500;600;700&family=Anuphan:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  --bg:#F4F7F3; --card:#FFFFFF; --ink:#182420; --muted:#68776E; --line:#E2E9E2;
+  --green:#1B4D33; --green-mid:#2E7A50; --green-soft:#E4F0E7; --green-fade:#F0F6F1;
+  --chili:#D94F3D; --chili-soft:#FCEAE6;
+  --c-p:#4A7FB5; --c-c:#DD9A32; --c-f:#B0699F; --c-na:#7C8B99; --c-sg:#E0607E;
+  --r-lg:22px; --r-md:16px; --r-sm:12px;
+  --shadow:0 4px 20px rgba(24,36,32,.07);
+  --font-num:'Prompt',sans-serif; --font-body:'Anuphan','Prompt',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html{font-size:16px}
+body{font-family:var(--font-body);background:var(--bg);color:var(--ink);line-height:1.55;-webkit-font-smoothing:antialiased;min-height:100dvh}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select{font-family:inherit;font-size:1rem;color:var(--ink)}
+input:focus-visible,select:focus-visible,button:focus-visible{outline:2.5px solid var(--green-mid);outline-offset:2px}
+.hidden{display:none!important}
+
+/* ===== shell ===== */
+#app{max-width:480px;margin:0 auto;min-height:100dvh;position:relative;background:var(--bg)}
+.screen{min-height:100dvh;display:flex;flex-direction:column}
+.view{padding:16px 16px 110px}
+
+/* ===== auth ===== */
+#scr-auth{justify-content:center;padding:24px;background:
+  radial-gradient(circle at 85% 8%, #E9F3EA 0%, transparent 45%),
+  radial-gradient(circle at 10% 95%, #F7ECE4 0%, transparent 40%), var(--bg)}
+.brand{text-align:center;margin-bottom:26px}
+.brand-mark{font-family:var(--font-num);font-weight:700;font-size:2.6rem;color:var(--green);letter-spacing:-.5px;line-height:1.1}
+.brand-mark .dot{color:var(--chili)}
+.brand-sub{color:var(--muted);font-weight:500;margin-top:6px}
+.auth-card{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:24px 20px}
+.auth-tabs{display:flex;background:var(--green-fade);border-radius:999px;padding:4px;margin-bottom:20px}
+.auth-tab{flex:1;padding:9px;border-radius:999px;font-weight:700;font-size:.95rem;color:var(--muted);transition:all .2s}
+.auth-tab.on{background:var(--green);color:#fff;box-shadow:0 2px 8px rgba(27,77,51,.3)}
+.auth-note{font-size:.82rem;color:var(--muted);text-align:center;margin-top:14px;line-height:1.5}
+
+/* ===== forms ===== */
+.field{margin-bottom:14px}
+.field label{display:block;font-weight:600;font-size:.9rem;margin-bottom:6px}
+.field input[type=text],.field input[type=password],.field input[type=number],.field input[type=search],.field select{
+  width:100%;padding:12px 14px;border:1.5px solid var(--line);border-radius:var(--r-sm);background:#FBFDFB;font-size:1rem;font-weight:500;transition:border-color .15s}
+.field input:focus,.field select:focus{border-color:var(--green-mid);outline:none}
+.field .hint{font-size:.8rem;color:var(--muted);margin-top:4px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.row3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:10px}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{flex:1;min-width:0;padding:11px 8px;border:1.5px solid var(--line);border-radius:var(--r-sm);background:#FBFDFB;font-weight:600;font-size:.92rem;text-align:center;transition:all .15s;color:var(--ink)}
+.chip.on{border-color:var(--green);background:var(--green-soft);color:var(--green)}
+.chips-col{display:flex;flex-direction:column;gap:8px}
+.chips-col .chip{text-align:left;display:flex;justify-content:space-between;align-items:center;gap:8px}
+.chip small{display:block;font-weight:500;color:var(--muted);font-size:.78rem}
+.chip.on small{color:var(--green-mid)}
+
+.btn{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:14px;border-radius:var(--r-md);font-weight:700;font-size:1.02rem;transition:transform .1s,filter .15s}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:linear-gradient(135deg,var(--green),var(--green-mid));color:#fff;box-shadow:0 4px 14px rgba(27,77,51,.28)}
+.btn-ghost{background:var(--green-fade);color:var(--green);font-weight:700}
+.btn-danger{background:var(--chili-soft);color:var(--chili)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.err{background:var(--chili-soft);color:var(--chili);border-radius:var(--r-sm);padding:10px 12px;font-size:.88rem;font-weight:600;margin-bottom:12px}
+
+/* ===== setup ===== */
+#scr-setup{padding:24px 20px 40px}
+.setup-head{margin:10px 0 20px}
+.setup-head h1{font-family:var(--font-num);font-size:1.5rem;color:var(--green)}
+.setup-head p{color:var(--muted);font-size:.92rem}
+.setup-card{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:20px;margin-bottom:16px}
+.target-preview{background:linear-gradient(135deg,var(--green),#276847);border-radius:var(--r-lg);color:#fff;padding:20px;margin-bottom:16px}
+.target-preview h3{font-size:.9rem;font-weight:600;opacity:.85;margin-bottom:8px}
+.tp-row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.15);font-size:.95rem}
+.tp-row:last-child{border-bottom:none}
+.tp-row b{font-family:var(--font-num);font-size:1.05rem}
+.tp-big{font-family:var(--font-num);font-size:2.2rem;font-weight:700;line-height:1.1}
+.tp-big small{font-size:1rem;font-weight:500;opacity:.85}
+
+/* ===== app header ===== */
+.app-head{padding:18px 16px 8px;display:flex;justify-content:space-between;align-items:center}
+.app-head .hi{font-family:var(--font-num);font-weight:600;font-size:1.15rem;color:var(--green)}
+.app-head .date{font-size:.82rem;color:var(--muted);font-weight:500}
+.date-nav{display:flex;align-items:center;gap:4px}
+.date-nav button{width:34px;height:34px;border-radius:50%;background:var(--card);box-shadow:var(--shadow);display:flex;align-items:center;justify-content:center;color:var(--green)}
+.date-nav .today-btn{width:auto;padding:0 12px;border-radius:999px;font-weight:700;font-size:.85rem}
+
+/* ===== hero gauge ===== */
+.hero{background:linear-gradient(150deg,#1B4D33 0%,#2A6B47 78%,#347A52 100%);border-radius:var(--r-lg);padding:20px 18px 16px;color:#fff;box-shadow:0 8px 26px rgba(27,77,51,.32);position:relative;overflow:hidden}
+.hero::after{content:"";position:absolute;right:-40px;top:-40px;width:160px;height:160px;border-radius:50%;background:rgba(255,255,255,.06)}
+.gauge-wrap{display:flex;align-items:center;gap:18px}
+.gauge{position:relative;width:150px;height:150px;flex-shrink:0}
+.gauge svg{transform:rotate(135deg)}
+.gauge .g-track{stroke:rgba(255,255,255,.18)}
+.gauge .g-fill{stroke:#FFD98E;transition:stroke-dasharray .6s cubic-bezier(.22,1,.36,1)}
+.gauge .g-fill.over{stroke:#FF9A85}
+.gauge-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+.gauge-center .g-num{font-family:var(--font-num);font-size:1.9rem;font-weight:700;line-height:1}
+.gauge-center .g-lbl{font-size:.75rem;opacity:.85;margin-top:3px;font-weight:500}
+.hero-side{flex:1;min-width:0}
+.hs-row{display:flex;justify-content:space-between;font-size:.85rem;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.14)}
+.hs-row:last-child{border:none}
+.hs-row b{font-family:var(--font-num);font-weight:600}
+.hero-msg{margin-top:10px;font-size:.85rem;background:rgba(255,255,255,.12);border-radius:var(--r-sm);padding:8px 12px;font-weight:500}
+
+/* ===== macro bars ===== */
+.macros{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:16px;margin-top:14px}
+.macros h3,.sec-title{font-family:var(--font-num);font-size:.95rem;font-weight:600;color:var(--ink);margin-bottom:10px}
+.mac-row{display:flex;align-items:center;gap:10px;padding:6px 0}
+.mac-name{width:64px;font-size:.88rem;font-weight:600;flex-shrink:0}
+.mac-bar{flex:1;height:9px;background:var(--green-fade);border-radius:99px;overflow:hidden}
+.mac-bar i{display:block;height:100%;border-radius:99px;transition:width .5s ease}
+.mac-val{width:96px;text-align:right;font-size:.8rem;color:var(--muted);font-weight:600;font-family:var(--font-num);flex-shrink:0}
+.mac-val.over{color:var(--chili)}
+.limit-chips{display:flex;gap:8px;margin-top:12px}
+.limit-chip{flex:1;background:var(--green-fade);border-radius:var(--r-sm);padding:8px 10px;font-size:.78rem;font-weight:600;color:var(--muted)}
+.limit-chip b{display:block;font-family:var(--font-num);font-size:.95rem;color:var(--ink)}
+.limit-chip.over{background:var(--chili-soft)}
+.limit-chip.over b{color:var(--chili)}
+
+/* ===== meals ===== */
+.meal-group{margin-top:16px}
+.meal-head{display:flex;justify-content:space-between;align-items:baseline;padding:0 4px 6px}
+.meal-head .m-kcal{font-family:var(--font-num);font-size:.85rem;color:var(--muted);font-weight:600}
+.entry{background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow);padding:12px 14px;display:flex;align-items:center;gap:12px;margin-bottom:8px}
+.entry .e-ico{width:38px;height:38px;border-radius:12px;background:var(--green-fade);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0}
+.entry .e-body{flex:1;min-width:0}
+.entry .e-name{font-weight:600;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.entry .e-sub{font-size:.78rem;color:var(--muted)}
+.entry .e-kcal{font-family:var(--font-num);font-weight:700;color:var(--green);font-size:1rem;flex-shrink:0}
+.entry .e-kcal small{font-size:.7rem;color:var(--muted);font-weight:500}
+.entry .e-del{width:32px;height:32px;border-radius:50%;color:#B9C4BC;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.entry .e-del:active{color:var(--chili)}
+.empty{background:var(--card);border:1.5px dashed var(--line);border-radius:var(--r-lg);padding:30px 20px;text-align:center;color:var(--muted);margin-top:16px}
+.empty .big{font-size:2rem;margin-bottom:6px}
+
+/* ===== bottom nav + fab ===== */
+.bottom-nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:100%;max-width:480px;background:rgba(255,255,255,.94);backdrop-filter:blur(12px);border-top:1px solid var(--line);display:flex;padding:6px 8px calc(8px + env(safe-area-inset-bottom));z-index:40}
+.nav-btn{flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;color:#9AA8A0;font-size:.7rem;font-weight:600;border-radius:12px}
+.nav-btn.on{color:var(--green)}
+.nav-btn svg{width:23px;height:23px}
+.fab{position:fixed;bottom:calc(76px + env(safe-area-inset-bottom));right:calc(50% - 240px + 18px);width:58px;height:58px;border-radius:50%;background:linear-gradient(135deg,var(--chili),#E96A50);color:#fff;box-shadow:0 6px 20px rgba(217,79,61,.45);display:flex;align-items:center;justify-content:center;z-index:41;transition:transform .12s}
+@media (max-width:508px){.fab{right:18px}}
+.fab:active{transform:scale(.92)}
+.fab svg{width:26px;height:26px}
+
+/* ===== history ===== */
+.chart-card{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:16px}
+.seg{display:flex;background:var(--green-fade);border-radius:999px;padding:3px;width:max-content;margin-bottom:12px}
+.seg button{padding:6px 16px;border-radius:999px;font-weight:700;font-size:.85rem;color:var(--muted)}
+.seg button.on{background:var(--green);color:#fff}
+.stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px}
+.stat{background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow);padding:14px}
+.stat .s-val{font-family:var(--font-num);font-size:1.4rem;font-weight:700;color:var(--green)}
+.stat .s-lbl{font-size:.8rem;color:var(--muted);font-weight:500}
+.day-row{background:var(--card);border-radius:var(--r-md);box-shadow:var(--shadow);padding:12px 14px;display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;width:100%;text-align:left}
+.day-row .d-date{font-weight:600;font-size:.92rem}
+.day-row .d-sub{font-size:.78rem;color:var(--muted)}
+.day-row .d-kcal{font-family:var(--font-num);font-weight:700;color:var(--green)}
+.day-row .d-kcal.over{color:var(--chili)}
+
+/* ===== profile view ===== */
+.pf-card{background:var(--card);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:18px;margin-bottom:14px}
+.pf-card h3{font-family:var(--font-num);font-size:1rem;margin-bottom:12px;color:var(--green)}
+.pf-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--green-fade);font-size:.92rem}
+.pf-row:last-child{border:none}
+.pf-row b{font-family:var(--font-num)}
+.key-status{display:inline-flex;align-items:center;gap:6px;font-size:.82rem;font-weight:700;padding:4px 10px;border-radius:999px}
+.key-status.ok{background:var(--green-soft);color:var(--green)}
+.key-status.no{background:var(--chili-soft);color:var(--chili)}
+details.howto{background:var(--green-fade);border-radius:var(--r-sm);padding:10px 12px;font-size:.85rem;margin-top:10px}
+details.howto summary{font-weight:700;color:var(--green);cursor:pointer}
+details.howto ol{padding-left:18px;margin-top:6px;color:var(--muted)}
+details.howto a{color:var(--green-mid);font-weight:600}
+
+/* ===== bottom sheets ===== */
+.sheet-mask{position:fixed;inset:0;background:rgba(16,28,22,.5);z-index:60;display:flex;align-items:flex-end;justify-content:center;opacity:0;pointer-events:none;transition:opacity .22s}
+.sheet-mask.open{opacity:1;pointer-events:auto}
+.sheet{width:100%;max-width:480px;background:var(--card);border-radius:24px 24px 0 0;padding:10px 18px calc(20px + env(safe-area-inset-bottom));transform:translateY(100%);transition:transform .28s cubic-bezier(.22,1,.36,1);max-height:88dvh;overflow-y:auto}
+.sheet-mask.open .sheet{transform:translateY(0)}
+.sheet-grab{width:44px;height:5px;border-radius:99px;background:var(--line);margin:4px auto 14px}
+.sheet h2{font-family:var(--font-num);font-size:1.15rem;margin-bottom:14px}
+.add-opt{display:flex;align-items:center;gap:14px;width:100%;padding:15px 14px;border-radius:var(--r-md);border:1.5px solid var(--line);background:#FBFDFB;margin-bottom:10px;text-align:left;transition:all .15s}
+.add-opt:active{background:var(--green-fade)}
+.add-opt .ao-ico{width:46px;height:46px;border-radius:14px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:#fff}
+.add-opt .ao-t{font-weight:700;font-size:1rem}
+.add-opt .ao-s{font-size:.8rem;color:var(--muted)}
+
+/* confirm items */
+.ci-item{border:1.5px solid var(--line);border-radius:var(--r-md);padding:12px;margin-bottom:10px}
+.ci-top{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.ci-name{font-weight:700;font-size:.98rem}
+.ci-portion{font-size:.8rem;color:var(--muted)}
+.ci-nut{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.ci-nut span{font-size:.75rem;font-weight:600;background:var(--green-fade);border-radius:999px;padding:3px 9px;color:var(--muted);font-family:var(--font-num)}
+.ci-nut span b{color:var(--ink)}
+.qty{display:flex;align-items:center;gap:2px;background:var(--green-fade);border-radius:999px;padding:3px}
+.qty button{width:30px;height:30px;border-radius:50%;background:#fff;font-weight:800;color:var(--green);font-size:1.05rem;box-shadow:0 1px 4px rgba(0,0,0,.08)}
+.qty .qv{min-width:44px;text-align:center;font-family:var(--font-num);font-weight:700;font-size:.9rem}
+.ci-remove{color:#B9C4BC;font-size:.8rem;font-weight:600;margin-top:6px}
+.meal-pick{display:flex;gap:8px;margin:12px 0}
+.meal-pick .chip{padding:8px 6px;font-size:.85rem}
+
+/* search list */
+.search-box{position:relative;margin-bottom:12px}
+.search-box input{width:100%;padding:13px 14px 13px 42px;border:1.5px solid var(--line);border-radius:var(--r-md);background:#FBFDFB;font-size:1rem}
+.search-box svg{position:absolute;left:13px;top:50%;transform:translateY(-50%);width:19px;height:19px;color:var(--muted)}
+.food-hit{display:flex;justify-content:space-between;align-items:center;width:100%;padding:11px 12px;border-radius:var(--r-sm);text-align:left;border-bottom:1px solid var(--green-fade)}
+.food-hit:active{background:var(--green-fade)}
+.food-hit .fh-n{font-weight:600;font-size:.93rem}
+.food-hit .fh-s{font-size:.76rem;color:var(--muted)}
+.food-hit .fh-k{font-family:var(--font-num);font-weight:700;color:var(--green);font-size:.9rem;flex-shrink:0}
+.ai-cta{margin-top:12px;background:linear-gradient(135deg,#3E3A6B,#5B4E9E);color:#fff;border-radius:var(--r-md);padding:13px;width:100%;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px}
+
+/* scan */
+#scan-video-wrap{position:relative;border-radius:var(--r-md);overflow:hidden;background:#111;aspect-ratio:3/4;margin-bottom:12px}
+#scan-video{width:100%;height:100%;object-fit:cover}
+.scan-line{position:absolute;left:10%;right:10%;top:50%;height:2.5px;background:var(--chili);border-radius:99px;box-shadow:0 0 14px rgba(217,79,61,.8);animation:scanmove 1.8s ease-in-out infinite}
+@keyframes scanmove{0%,100%{transform:translateY(-46px)}50%{transform:translateY(46px)}}
+
+/* photo preview */
+#photo-preview{width:100%;border-radius:var(--r-md);max-height:300px;object-fit:cover;margin-bottom:12px}
+
+/* loading overlay */
+#overlay-loading{position:fixed;inset:0;background:rgba(16,28,22,.65);z-index:80;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:#fff}
+.spinner{width:46px;height:46px;border-radius:50%;border:4px solid rgba(255,255,255,.25);border-top-color:#FFD98E;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loading-text{font-weight:600}
+
+/* toast */
+#toast{position:fixed;bottom:calc(90px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%) translateY(20px);background:var(--ink);color:#fff;padding:11px 20px;border-radius:999px;font-size:.9rem;font-weight:600;z-index:90;opacity:0;transition:all .25s;pointer-events:none;max-width:88%;text-align:center}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+/* confirm dialog */
+.dialog-mask{position:fixed;inset:0;background:rgba(16,28,22,.5);z-index:70;display:flex;align-items:center;justify-content:center;padding:24px}
+.dialog{background:var(--card);border-radius:var(--r-lg);padding:22px;max-width:340px;width:100%}
+.dialog h3{font-family:var(--font-num);margin-bottom:8px}
+.dialog p{color:var(--muted);font-size:.92rem;margin-bottom:18px}
+.dialog .row2{gap:10px}
+
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- ========== AUTH ========== -->
+  <section id="scr-auth" class="screen">
+    <div class="brand">
+      <div class="brand-mark">นับแคล<span class="dot">.</span></div>
+      <div class="brand-sub">กินเท่าไหร่ รู้เท่าทัน</div>
+    </div>
+    <div class="auth-card">
+      <div class="auth-tabs">
+        <button class="auth-tab on" id="tab-login" type="button">เข้าสู่ระบบ</button>
+        <button class="auth-tab" id="tab-register" type="button">สมัครใหม่</button>
+      </div>
+      <div id="auth-err" class="err hidden"></div>
+      <form id="auth-form">
+        <div class="field">
+          <label for="auth-user">ชื่อผู้ใช้</label>
+          <input type="text" id="auth-user" autocomplete="username" placeholder="เช่น somchai" required/>
+        </div>
+        <div class="field">
+          <label for="auth-pass">รหัสผ่าน</label>
+          <input type="password" id="auth-pass" autocomplete="current-password" placeholder="อย่างน้อย 4 ตัว" required/>
+        </div>
+        <button class="btn btn-primary" type="submit" id="auth-submit">เข้าสู่ระบบ</button>
+      </form>
+      <p class="auth-note">ข้อมูลทั้งหมดเก็บอยู่ในเครื่องนี้เท่านั้น ไม่ได้ส่งขึ้นเซิร์ฟเวอร์</p>
+    </div>
+  </section>
+
+  <!-- ========== PROFILE SETUP ========== -->
+  <section id="scr-setup" class="screen hidden">
+    <div class="setup-head">
+      <h1 id="setup-title">มารู้จักตัวคุณกันก่อน</h1>
+      <p>ใช้คำนวณว่าแต่ละวันคุณควรกินกี่แคล</p>
+    </div>
+    <form id="setup-form">
+      <div class="setup-card">
+        <div class="field">
+          <label>เพศ</label>
+          <div class="chips" id="sex-chips">
+            <button type="button" class="chip" data-v="m">ชาย</button>
+            <button type="button" class="chip" data-v="f">หญิง</button>
+          </div>
+        </div>
+        <div class="row3">
+          <div class="field"><label for="f-age">อายุ (ปี)</label><input type="number" id="f-age" min="10" max="100" inputmode="numeric" required/></div>
+          <div class="field"><label for="f-weight">น้ำหนัก (กก.)</label><input type="number" id="f-weight" min="25" max="300" step="0.1" inputmode="decimal" required/></div>
+          <div class="field"><label for="f-height">ส่วนสูง (ซม.)</label><input type="number" id="f-height" min="100" max="250" inputmode="numeric" required/></div>
+        </div>
+      </div>
+      <div class="setup-card">
+        <div class="field">
+          <label>ปกติขยับตัวแค่ไหน</label>
+          <div class="chips-col" id="act-chips">
+            <button type="button" class="chip" data-v="1.2">นั่งเป็นหลัก แทบไม่ออกกำลัง<small>ทำงานออฟฟิศ ไม่ค่อยเดิน</small></button>
+            <button type="button" class="chip" data-v="1.375">ออกกำลังเบา ๆ 1–3 วัน/สัปดาห์<small>เดินเยอะ หรือออกกำลังบ้าง</small></button>
+            <button type="button" class="chip" data-v="1.55">ออกกำลัง 3–5 วัน/สัปดาห์<small>เหงื่อออกจริงจังเกือบทุกวันเว้นวัน</small></button>
+            <button type="button" class="chip" data-v="1.725">ออกกำลังหนัก 6–7 วัน/สัปดาห์<small>ซ้อมหนักแทบทุกวัน</small></button>
+            <button type="button" class="chip" data-v="1.9">งานใช้แรง / นักกีฬา<small>งานแบกหาม หรือซ้อมวันละ 2 รอบ</small></button>
+          </div>
+        </div>
+      </div>
+      <div class="setup-card">
+        <div class="field">
+          <label>เป้าหมายของคุณ</label>
+          <div class="chips-col" id="goal-chips">
+            <button type="button" class="chip" data-v="cut">ลดไขมัน<small>กินน้อยกว่าที่เผาผลาญวันละ 500 แคล</small></button>
+            <button type="button" class="chip" data-v="maintain">รักษาน้ำหนัก<small>กินเท่าที่เผาผลาญพอดี</small></button>
+            <button type="button" class="chip" data-v="muscle">เพิ่มกล้ามเนื้อ<small>กินเกินนิดหน่อย +300 แคล เน้นโปรตีน</small></button>
+            <button type="button" class="chip" data-v="gain">เพิ่มน้ำหนัก<small>กินเกินวันละ 500 แคล</small></button>
+          </div>
+        </div>
+      </div>
+      <div class="target-preview hidden" id="target-preview"></div>
+      <button class="btn btn-primary" type="submit" id="setup-submit">บันทึกและเริ่มใช้งาน</button>
+      <button class="btn btn-ghost hidden" type="button" id="setup-cancel" style="margin-top:10px">ยกเลิก</button>
+    </form>
+  </section>
+
+  <!-- ========== MAIN APP ========== -->
+  <section id="scr-app" class="screen hidden">
+    <header class="app-head">
+      <div>
+        <div class="hi" id="head-hi">สวัสดี</div>
+        <div class="date" id="head-date"></div>
+      </div>
+      <div class="date-nav" id="date-nav">
+        <button type="button" id="date-prev" aria-label="วันก่อนหน้า">‹</button>
+        <button type="button" id="date-today" class="today-btn">วันนี้</button>
+        <button type="button" id="date-next" aria-label="วันถัดไป">›</button>
+      </div>
+    </header>
+
+    <!-- HOME -->
+    <div class="view" id="view-home"></div>
+    <!-- HISTORY -->
+    <div class="view hidden" id="view-history"></div>
+    <!-- PROFILE -->
+    <div class="view hidden" id="view-profile"></div>
+
+    <button class="fab" id="fab-add" aria-label="เพิ่มอาหาร">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+    </button>
+
+    <nav class="bottom-nav">
+      <button class="nav-btn on" data-view="home" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/></svg>
+        วันนี้
+      </button>
+      <button class="nav-btn" data-view="history" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 20V10M10 20V4M16 20v-8M22 20H2"/></svg>
+        ย้อนหลัง
+      </button>
+      <button class="nav-btn" data-view="profile" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6.5 8-6.5s8 2.5 8 6.5"/></svg>
+        โปรไฟล์
+      </button>
+    </nav>
+  </section>
+
+  <!-- ========== ADD SHEET ========== -->
+  <div class="sheet-mask" id="sheet-add">
+    <div class="sheet">
+      <div class="sheet-grab"></div>
+      <h2>กินอะไรมา บอกหน่อย</h2>
+      <button class="add-opt" id="opt-photo" type="button">
+        <span class="ao-ico" style="background:linear-gradient(135deg,#2E7A50,#4C9E6E)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h2.5L9 5h6l2.5 3H20a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1Z"/><circle cx="12" cy="14" r="3.5"/></svg>
+        </span>
+        <span><span class="ao-t">ถ่ายรูปอาหาร</span><br/><span class="ao-s">AI ดูรูปแล้วคำนวณแคลให้</span></span>
+      </button>
+      <button class="add-opt" id="opt-scan" type="button">
+        <span class="ao-ico" style="background:linear-gradient(135deg,#3E3A6B,#5B4E9E)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 7V4h4M21 7V4h-4M3 17v3h4M21 17v3h-4M7 8v8M11 8v8M15 8v8M18 8v8"/></svg>
+        </span>
+        <span><span class="ao-t">สแกนบาร์โค้ด</span><br/><span class="ao-s">ขนม เครื่องดื่ม ของในเซเว่น</span></span>
+      </button>
+      <button class="add-opt" id="opt-manual" type="button">
+        <span class="ao-ico" style="background:linear-gradient(135deg,#C67A2E,#DD9A32)">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+        </span>
+        <span><span class="ao-t">พิมพ์เอง</span><br/><span class="ao-s">ค้นหาเมนู หรือให้ AI ประเมินจากข้อความ</span></span>
+      </button>
+      <input type="file" id="photo-input" accept="image/*" capture="environment" class="hidden"/>
+    </div>
+  </div>
+
+  <!-- ========== MANUAL SHEET ========== -->
+  <div class="sheet-mask" id="sheet-manual">
+    <div class="sheet">
+      <div class="sheet-grab"></div>
+      <h2>พิมพ์สิ่งที่กิน</h2>
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input type="search" id="food-search" placeholder="เช่น กะเพราไก่, ชาเย็น, ข้าวมันไก่"/>
+      </div>
+      <div id="food-results"></div>
+      <button class="ai-cta hidden" id="ai-text-btn" type="button">✨ ให้ AI ประเมิน "<span id="ai-text-q"></span>"</button>
+    </div>
+  </div>
+
+  <!-- ========== SCAN SHEET ========== -->
+  <div class="sheet-mask" id="sheet-scan">
+    <div class="sheet">
+      <div class="sheet-grab"></div>
+      <h2>สแกนบาร์โค้ด</h2>
+      <div id="scan-video-wrap" class="hidden">
+        <video id="scan-video" playsinline muted></video>
+        <div class="scan-line"></div>
+      </div>
+      <p id="scan-hint" style="font-size:.85rem;color:var(--muted);margin-bottom:12px">เล็งบาร์โค้ดหลังซองให้อยู่กลางจอ</p>
+      <div class="field">
+        <label for="ean-input">หรือพิมพ์ตัวเลขใต้บาร์โค้ด</label>
+        <input type="text" id="ean-input" inputmode="numeric" placeholder="เช่น 8850329112224"/>
+      </div>
+      <button class="btn btn-primary" id="ean-lookup" type="button">ค้นหาสินค้า</button>
+    </div>
+  </div>
+
+  <!-- ========== CONFIRM SHEET ========== -->
+  <div class="sheet-mask" id="sheet-confirm">
+    <div class="sheet">
+      <div class="sheet-grab"></div>
+      <h2 id="confirm-title">เจอสิ่งนี้ในรูป</h2>
+      <p id="confirm-note" style="font-size:.83rem;color:var(--muted);margin:-8px 0 12px"></p>
+      <div id="confirm-items"></div>
+      <div class="field" style="margin-top:8px">
+        <label>เป็นมื้อไหน</label>
+        <div class="meal-pick chips" id="meal-chips">
+          <button type="button" class="chip" data-v="b">เช้า</button>
+          <button type="button" class="chip" data-v="l">เที่ยง</button>
+          <button type="button" class="chip" data-v="d">เย็น</button>
+          <button type="button" class="chip" data-v="s">ของว่าง</button>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="confirm-save" type="button">บันทึกลงวันนี้</button>
+    </div>
+  </div>
+
+  <!-- ========== LOADING / TOAST / DIALOG ========== -->
+  <div id="overlay-loading" class="hidden">
+    <div class="spinner"></div>
+    <div id="loading-text">AI กำลังดูรูปอาหาร…</div>
+  </div>
+  <div id="toast"></div>
+  <div class="dialog-mask hidden" id="dialog">
+    <div class="dialog">
+      <h3 id="dlg-title"></h3>
+      <p id="dlg-msg"></p>
+      <div class="row2">
+        <button class="btn btn-ghost" id="dlg-cancel" type="button">ยกเลิก</button>
+        <button class="btn btn-danger" id="dlg-ok" type="button">ยืนยัน</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+<script>
+"use strict";
+/* ================= ฐานข้อมูลอาหารไทย (ค่าโดยประมาณต่อ 1 หน่วยที่ระบุ) =================
+   [ชื่อ, หน่วย, แคล, โปรตีน g, คาร์บ g, ไขมัน g, โซเดียม mg, น้ำตาล g] */
+const FOOD_DB = [
+["ข้าวสวย","จาน (2 ทัพพี)",210,4,46,0.5,0,0],
+["ข้าวสวย 1 ทัพพี","ทัพพี",105,2,23,0.2,0,0],
+["ข้าวกล้อง","จาน",200,5,42,1.5,0,0],
+["ข้าวเหนียว","ถุงเล็ก",240,5,52,0.5,0,0],
+["ข้าวกะเพราไก่ไข่ดาว","จาน",650,30,55,33,1400,4],
+["ข้าวกะเพราหมูสับ","จาน",580,24,54,29,1300,4],
+["ข้าวผัดหมู","จาน",560,18,68,22,1100,5],
+["ข้าวผัดกุ้ง","จาน",530,20,66,19,1000,4],
+["ข้าวมันไก่","จาน",620,25,70,25,1150,2],
+["ข้าวหมูแดง","จาน",560,22,75,18,1200,8],
+["ข้าวหมูกรอบ","จาน",700,22,62,38,1100,5],
+["ข้าวขาหมู","จาน",690,28,64,34,1300,6],
+["ข้าวหน้าเป็ด","จาน",630,25,68,26,1100,6],
+["ข้าวไข่เจียวหมูสับ","จาน",520,18,48,28,900,2],
+["ข้าวคลุกกะปิ","จาน",550,18,65,24,1400,8],
+["ผัดไทยกุ้งสด","จาน",580,20,70,24,1200,12],
+["ผัดซีอิ๊วหมู","จาน",520,17,62,22,1300,8],
+["ราดหน้าหมู","จาน",460,18,58,17,1400,6],
+["ก๋วยเตี๋ยวเรือน้ำตก","ชาม",350,15,45,12,1500,5],
+["ก๋วยเตี๋ยวน้ำใสหมู","ชาม",320,16,44,9,1400,4],
+["บะหมี่หมูแดงแห้ง","ชาม",480,18,60,18,1300,5],
+["เย็นตาโฟ","ชาม",380,18,50,12,1600,8],
+["เกาเหลาเลือดหมู","ชาม",200,18,6,11,1200,2],
+["ขนมจีนน้ำยาไก่","จาน",380,14,52,13,1100,4],
+["ข้าวซอยไก่","ชาม",600,20,58,32,1200,8],
+["สุกี้น้ำหมู","ชาม",300,20,30,10,1500,6],
+["ต้มยำกุ้งน้ำใส","ถ้วย",120,14,8,3,1200,4],
+["ต้มยำกุ้งน้ำข้น","ถ้วย",250,15,10,17,1300,5],
+["แกงเขียวหวานไก่","ถ้วย",320,18,12,24,900,6],
+["พะแนงหมู","ถ้วย",350,20,10,26,850,5],
+["มัสมั่นไก่","ถ้วย",430,20,22,30,800,10],
+["แกงส้มผักรวม","ถ้วย",130,10,14,3,1100,7],
+["แกงจืดเต้าหู้หมูสับ","ถ้วย",150,13,8,7,900,2],
+["ผัดผักบุ้งไฟแดง","จาน",180,6,12,13,800,3],
+["ผัดคะน้าหมูกรอบ","จาน",320,14,12,25,900,3],
+["ส้มตำไทย","จาน",120,4,22,2,1100,12],
+["ส้มตำปูปลาร้า","จาน",130,6,18,2,1800,8],
+["ลาบหมู","จาน",250,22,8,15,1000,3],
+["น้ำตกหมู","จาน",270,24,8,16,1000,3],
+["ไก่ย่าง","น่อง+สะโพก",290,28,2,19,500,1],
+["คอหมูย่าง","100 ก.",300,17,1,26,600,1],
+["หมูปิ้ง","ไม้",110,6,4,8,250,3],
+["ไส้กรอกอีสาน","ชิ้น",150,7,8,10,400,1],
+["ลูกชิ้นปิ้ง","ไม้ (4 ลูก)",90,6,6,4,450,1],
+["ปลาทูทอด","ตัว",150,18,0,9,350,0],
+["ปลากะพงนึ่งมะนาว","100 ก.",120,22,2,3,700,1],
+["กุ้งต้ม","100 ก.",100,21,0,1,300,0],
+["อกไก่ต้ม/ย่าง","100 ก.",165,31,0,4,75,0],
+["ไข่ต้ม","ฟอง",75,6,0.5,5,65,0],
+["ไข่ดาว","ฟอง",110,6,0.5,9,95,0],
+["ไข่เจียว","ฟอง",130,6,1,11,300,0],
+["เต้าหู้ไข่","หลอด",90,8,3,5,30,1],
+["โจ๊กหมูใส่ไข่","ถ้วย",300,15,40,9,1000,1],
+["ข้าวต้มหมู","ถ้วย",250,13,38,5,900,1],
+["มาม่าต้ม","ซอง",320,8,45,13,1500,3],
+["ปลากระป๋องซอสมะเขือเทศ","กระป๋อง",180,18,6,9,600,4],
+["ข้าวโพดต้ม","ฝัก",130,4,27,2,10,5],
+["มันหวานต้ม","100 ก.",90,1.5,21,0,40,6],
+["สลัดผัก + น้ำสลัดใส","จาน",150,4,12,9,300,5],
+["สลัดอกไก่","จาน",280,28,12,13,450,5],
+["แซนด์วิชทูน่า","ชิ้น",320,15,38,12,600,5],
+["ขนมปังปิ้ง เนย+น้ำตาล","แผ่น",220,4,32,8,200,8],
+["ซาลาเปาหมูสับ","ลูก",220,8,32,6,350,6],
+["ขนมจีบ","4 ชิ้น",180,10,14,9,500,1],
+["ปาท่องโก๋","3 ตัว",200,3,22,11,200,2],
+["น้ำเต้าหู้","แก้ว",130,6,18,3,50,12],
+["ติ่มซำรวม","เข่ง",160,8,16,7,450,1],
+["เกี๊ยวซ่า","5 ชิ้น",250,10,28,11,600,2],
+["หอยทอด","จาน",500,16,45,28,1000,4],
+["ไก่ทอด","ชิ้น (น่อง)",250,16,8,17,450,0],
+["นักเก็ตไก่","6 ชิ้น",270,14,16,17,500,0],
+["เฟรนช์ฟรายส์","กลาง",340,4,44,16,250,0],
+["เบอร์เกอร์หมู/ไก่","ชิ้น",450,20,40,23,800,7],
+["พิซซ่า","ชิ้น",280,12,32,12,650,4],
+["หมูกระทะ","1 มื้อ",900,45,30,65,1800,10],
+["ชาบู/สุกี้บุฟเฟ่ต์","1 มื้อ",800,50,40,45,2200,12],
+["กล้วยหอม","ลูก",105,1.3,27,0.3,1,14],
+["แอปเปิ้ล","ลูก",95,0.5,25,0.3,2,19],
+["ส้ม","ลูก",60,1,15,0.2,0,12],
+["ฝรั่ง","ลูก",110,4,24,1,5,15],
+["มะม่วงสุก","ลูก",200,2,50,1,3,45],
+["แตงโม","ถ้วย",45,1,11,0.2,2,9],
+["สับปะรด","ถ้วย",80,1,22,0.2,2,16],
+["องุ่น","ถ้วย",100,1,27,0.2,3,23],
+["นมจืด","กล่อง 225 มล.",150,8,12,8,120,12],
+["นมพร่องมันเนย","กล่อง 225 มล.",100,8,12,2.5,125,12],
+["นมเปรี้ยว","ขวดเล็ก",90,2,19,0.5,40,18],
+["โยเกิร์ตรสธรรมชาติ","ถ้วย",100,8,10,3,70,9],
+["เวย์โปรตีน","สกู๊ป",120,24,3,1.5,100,2],
+["น้ำเปล่า","แก้ว",0,0,0,0,0,0],
+["อเมริกาโน่เย็น ไม่หวาน","แก้ว",10,0.5,1,0,10,0],
+["ลาเต้เย็น","แก้ว",180,6,18,9,100,16],
+["ชาเย็น","แก้ว",220,3,38,7,80,34],
+["ชานมไข่มุก","แก้ว",350,5,58,11,120,38],
+["ชาเขียวพร้อมดื่ม","ขวด",140,0,35,0,50,33],
+["น้ำอัดลม","กระป๋อง",140,0,35,0,30,35],
+["น้ำอัดลมไม่มีน้ำตาล","กระป๋อง",1,0,0,0,30,0],
+["น้ำส้มคั้น","แก้ว",110,1,26,0,2,21],
+["เบียร์","กระป๋อง 330 มล.",145,1,11,0,10,0],
+["เบียร์ขวดใหญ่","ขวด 620 มล.",270,2,20,0,20,0],
+["เหล้า","ช็อต",100,0,0,0,0,0],
+["ไอศกรีม","ลูก",140,2,17,7,50,15],
+["เค้ก","ชิ้น",350,4,45,17,300,30],
+["คุกกี้","2 ชิ้น",150,2,20,7,100,10],
+["ช็อกโกแลต","แท่งเล็ก 45 ก.",240,3,26,14,35,22],
+["มันฝรั่งทอดกรอบ","ถุงเล็ก 30 ก.",160,2,15,10,170,1],
+["ถั่วลิสงคั่ว","กำมือ 30 ก.",170,7,6,14,90,1],
+["อัลมอนด์","กำมือ 28 ก.",165,6,6,14,0,1],
+["ขนมครก","4 คู่",240,4,30,12,150,12],
+["โรตีใส่นม","แผ่น",400,7,52,18,300,22],
+["กล้วยทอด","3 ชิ้น",250,2,35,12,150,14],
+["ข้าวเหนียวมะม่วง","จาน",450,6,80,12,150,35]
+];
+
+/* ================= สูตรคำนวณเป้าหมายต่อวัน ================= */
+const GOALS = {
+  cut:      {label:"ลดไขมัน",      adj:-500, protein:1.8, why:"หัก 500 แคลจากที่เผาผลาญ (calorie deficit) ≈ ลดไขมัน 0.5 กก./สัปดาห์"},
+  maintain: {label:"รักษาน้ำหนัก", adj:0,    protein:1.4, why:"กินเท่าที่ร่างกายเผาผลาญพอดี น้ำหนักคงที่"},
+  muscle:   {label:"เพิ่มกล้ามเนื้อ", adj:300,  protein:1.8, why:"บวก 300 แคลแบบ lean bulk เน้นโปรตีนสูง สร้างกล้ามโดยไขมันไม่พุ่ง"},
+  gain:     {label:"เพิ่มน้ำหนัก",  adj:500,  protein:1.6, why:"บวก 500 แคลจากที่เผาผลาญ ≈ เพิ่มน้ำหนัก 0.5 กก./สัปดาห์"}
+};
+const ACTS = {"1.2":"นั่งเป็นหลัก","1.375":"ออกกำลังเบา 1–3 วัน/สัปดาห์","1.55":"ออกกำลัง 3–5 วัน/สัปดาห์","1.725":"ออกกำลังหนัก 6–7 วัน","1.9":"งานใช้แรง/นักกีฬา"};
+const MEALS = {b:"มื้อเช้า",l:"มื้อเที่ยง",d:"มื้อเย็น",s:"ของว่าง"};
+const MEAL_ICONS = {b:"🌅",l:"☀️",d:"🌙",s:"🍪"};
+
+// Mifflin–St Jeor
+function calcTargets(pf){
+  const w=+pf.weight,h=+pf.height,a=+pf.age;
+  const bmr = Math.round(10*w + 6.25*h - 5*a + (pf.sex==="m"?5:-161));
+  const tdee = Math.round(bmr * +pf.act);
+  const g = GOALS[pf.goal];
+  let kcal = tdee + g.adj;
+  const floor = pf.sex==="m"?1500:1200; // ไม่ให้ต่ำจนอันตราย
+  if(kcal < floor) kcal = floor;
+  const protein = Math.round(w * g.protein);
+  const fat = Math.round(kcal*0.275/9);
+  const carb = Math.max(0, Math.round((kcal - protein*4 - fat*9)/4));
+  const sugar = Math.round(kcal*0.10/4); // เพดาน WHO: ไม่เกิน 10% ของพลังงาน
+  return {bmr,tdee,kcal,protein,fat,carb,sodium:2000,sugar,adj:g.adj,goalLabel:g.label,why:g.why};
+}
+function mealByHour(h){ return h<11?"b":h<15?"l":h<21?"d":"s"; }
+
+/* ================= helpers ================= */
+const $ = s => document.querySelector(s);
+const $$ = s => [...document.querySelectorAll(s)];
+const lsGet = (k,d) => { try{ const v = localStorage.getItem(k); return v===null?d:JSON.parse(v); }catch(e){ return d; } };
+const lsSet = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2,8);
+const esc = s => String(s).replace(/[&<>"']/g, m => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const r1 = n => Math.round(n*10)/10;
+async function sha256(text){
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(text));
+  return [...new Uint8Array(buf)].map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+const pad = n => String(n).padStart(2,"0");
+const dateKey = d => `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+function fmtDateTH(d){ return d.toLocaleDateString("th-TH",{weekday:"short",day:"numeric",month:"short",year:"numeric"}); }
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(t._h); t._h = setTimeout(()=>t.classList.remove("show"), 2600);
+}
+function askConfirm(title,msg,okText){
+  return new Promise(res=>{
+    $("#dlg-title").textContent = title; $("#dlg-msg").textContent = msg;
+    $("#dlg-ok").textContent = okText || "ยืนยัน";
+    $("#dialog").classList.remove("hidden");
+    const done = v => { $("#dialog").classList.add("hidden"); res(v); };
+    $("#dlg-ok").onclick = ()=>done(true);
+    $("#dlg-cancel").onclick = ()=>done(false);
+  });
+}
+function showLoading(text){ $("#loading-text").textContent = text; $("#overlay-loading").classList.remove("hidden"); }
+function hideLoading(){ $("#overlay-loading").classList.add("hidden"); }
+function openSheet(id){ $(id).classList.add("open"); }
+function closeSheet(id){ $(id).classList.remove("open"); if(id==="#sheet-scan") stopScan(); }
+function closeAllSheets(){ ["#sheet-add","#sheet-manual","#sheet-scan","#sheet-confirm"].forEach(closeSheet); }
+$$(".sheet-mask").forEach(m => m.addEventListener("click", e => { if(e.target===m){ m.classList.remove("open"); if(m.id==="sheet-scan") stopScan(); } }));
+
+/* ================= state & storage ================= */
+const S = { user:null, targets:null, curDate:new Date(), view:"home", pending:[], pendingMeal:null, histRange:7, scanStream:null, scanRun:false };
+const getUsers = () => lsGet("nc_users", []);
+const saveUsers = u => lsSet("nc_users", u);
+const logKey = () => "nc_log_" + S.user.id;
+const getLog = () => lsGet(logKey(), {});
+const saveLog = l => lsSet(logKey(), l);
+const getKey = () => lsGet("nc_gemini_key", "");
+
+/* ================= auth ================= */
+let authMode = "login";
+function setAuthMode(m){
+  authMode = m;
+  $("#tab-login").classList.toggle("on", m==="login");
+  $("#tab-register").classList.toggle("on", m==="register");
+  $("#auth-submit").textContent = m==="login" ? "เข้าสู่ระบบ" : "สมัครและเริ่มใช้งาน";
+  $("#auth-pass").autocomplete = m==="login" ? "current-password" : "new-password";
+  $("#auth-err").classList.add("hidden");
+}
+$("#tab-login").onclick = ()=>setAuthMode("login");
+$("#tab-register").onclick = ()=>setAuthMode("register");
+function authErr(msg){ const e = $("#auth-err"); e.textContent = msg; e.classList.remove("hidden"); }
+$("#auth-form").addEventListener("submit", async e => {
+  e.preventDefault();
+  const un = $("#auth-user").value.trim();
+  const pw = $("#auth-pass").value;
+  if(!un) return authErr("กรอกชื่อผู้ใช้ก่อนนะ");
+  if(pw.length < 4) return authErr("รหัสผ่านต้องยาวอย่างน้อย 4 ตัว");
+  const users = getUsers();
+  const found = users.find(u => u.un.toLowerCase() === un.toLowerCase());
+  if(authMode === "register"){
+    if(found) return authErr("ชื่อนี้มีคนใช้แล้วในเครื่องนี้ ลองชื่ออื่น หรือกดเข้าสู่ระบบ");
+    const salt = uid();
+    const user = { id:uid(), un, salt, hash: await sha256(salt+pw), profile:null, created:Date.now() };
+    users.push(user); saveUsers(users);
+    lsSet("nc_session", user.id);
+    enter(user);
+  } else {
+    if(!found) return authErr("ไม่พบชื่อนี้ ถ้ายังไม่เคยสมัคร กด “สมัครใหม่” ก่อน");
+    if(await sha256(found.salt+pw) !== found.hash) return authErr("รหัสผ่านไม่ถูกต้อง");
+    lsSet("nc_session", found.id);
+    enter(found);
+  }
+});
+function logout(){
+  localStorage.removeItem("nc_session");
+  S.user = null;
+  $("#scr-app").classList.add("hidden");
+  $("#scr-setup").classList.add("hidden");
+  $("#scr-auth").classList.remove("hidden");
+  $("#auth-pass").value = "";
+}
+function enter(user){
+  S.user = user;
+  $("#scr-auth").classList.add("hidden");
+  if(!user.profile){ showSetup(false); } else { S.targets = calcTargets(user.profile); showApp(); }
+}
+
+/* ================= profile setup ================= */
+const setupSel = { sex:null, act:null, goal:null };
+function bindChipGroup(groupId, key){
+  $("#"+groupId).addEventListener("click", e => {
+    const btn = e.target.closest(".chip"); if(!btn) return;
+    setupSel[key] = btn.dataset.v;
+    $$("#"+groupId+" .chip").forEach(c => c.classList.toggle("on", c===btn));
+    previewTargets();
+  });
+}
+bindChipGroup("sex-chips","sex"); bindChipGroup("act-chips","act"); bindChipGroup("goal-chips","goal");
+["f-age","f-weight","f-height"].forEach(id => $("#"+id).addEventListener("input", previewTargets));
+function readSetupForm(){
+  const age = +$("#f-age").value, weight = +$("#f-weight").value, height = +$("#f-height").value;
+  if(!setupSel.sex || !setupSel.act || !setupSel.goal || !age || !weight || !height) return null;
+  return { sex:setupSel.sex, act:setupSel.act, goal:setupSel.goal, age, weight, height };
+}
+function previewTargets(){
+  const pf = readSetupForm();
+  const box = $("#target-preview");
+  if(!pf){ box.classList.add("hidden"); return; }
+  const t = calcTargets(pf);
+  box.classList.remove("hidden");
+  box.innerHTML = `
+    <h3>เป้าหมายของคุณ · ${esc(t.goalLabel)}</h3>
+    <div class="tp-big">${t.kcal.toLocaleString()} <small>แคล/วัน</small></div>
+    <div style="font-size:.83rem;opacity:.85;margin:4px 0 10px">${esc(t.why)}</div>
+    <div class="tp-row"><span>ร่างกายเผาผลาญ (TDEE)</span><b>${t.tdee.toLocaleString()} แคล</b></div>
+    <div class="tp-row"><span>${t.adj===0?"ไม่บวกไม่ลบ":(t.adj>0?"บวกเพิ่ม":"หักออก")} </span><b>${t.adj>0?"+":""}${t.adj} แคล</b></div>
+    <div class="tp-row"><span>โปรตีน</span><b>${t.protein} ก.</b></div>
+    <div class="tp-row"><span>คาร์บ</span><b>${t.carb} ก.</b></div>
+    <div class="tp-row"><span>ไขมัน</span><b>${t.fat} ก.</b></div>
+    <div class="tp-row"><span>โซเดียมไม่เกิน</span><b>${t.sodium.toLocaleString()} มก.</b></div>
+    <div class="tp-row"><span>น้ำตาลไม่เกิน</span><b>${t.sugar} ก.</b></div>`;
+}
+function showSetup(editing){
+  $("#scr-app").classList.add("hidden");
+  $("#scr-setup").classList.remove("hidden");
+  $("#setup-title").textContent = editing ? "แก้ไขข้อมูลของคุณ" : "มารู้จักตัวคุณกันก่อน";
+  $("#setup-cancel").classList.toggle("hidden", !editing);
+  const pf = S.user.profile;
+  if(pf){
+    $("#f-age").value = pf.age; $("#f-weight").value = pf.weight; $("#f-height").value = pf.height;
+    setupSel.sex = pf.sex; setupSel.act = pf.act; setupSel.goal = pf.goal;
+    $$("#sex-chips .chip").forEach(c => c.classList.toggle("on", c.dataset.v===pf.sex));
+    $$("#act-chips .chip").forEach(c => c.classList.toggle("on", c.dataset.v===pf.act));
+    $$("#goal-chips .chip").forEach(c => c.classList.toggle("on", c.dataset.v===pf.goal));
+    previewTargets();
+  }
+  window.scrollTo(0,0);
+}
+$("#setup-cancel").onclick = ()=>{ $("#scr-setup").classList.add("hidden"); showApp(); };
+$("#setup-form").addEventListener("submit", e => {
+  e.preventDefault();
+  const pf = readSetupForm();
+  if(!pf){ toast("กรอกให้ครบทุกช่องก่อนนะ"); return; }
+  S.user.profile = pf;
+  const users = getUsers();
+  const i = users.findIndex(u=>u.id===S.user.id);
+  if(i>-1){ users[i] = S.user; saveUsers(users); }
+  S.targets = calcTargets(pf);
+  $("#scr-setup").classList.add("hidden");
+  showApp();
+  toast("บันทึกแล้ว เป้าวันนี้ " + S.targets.kcal.toLocaleString() + " แคล");
+});
+
+/* ================= main app shell ================= */
+function showApp(){
+  $("#scr-app").classList.remove("hidden");
+  S.curDate = new Date();
+  switchView("home");
+}
+function greeting(){
+  const h = new Date().getHours();
+  if(h<11) return "เช้านี้กินอะไรดี ☀️";
+  if(h<15) return "มื้อเที่ยงแล้ว 🍛";
+  if(h<18) return "สวัสดียามบ่าย 🌤️";
+  if(h<22) return "เย็นนี้กินให้พอดีนะ 🌆";
+  return "ดึกแล้ว หิวหรือเปล่า 🌙";
+}
+function switchView(v){
+  S.view = v;
+  $$(".nav-btn").forEach(b => b.classList.toggle("on", b.dataset.view===v));
+  $("#view-home").classList.toggle("hidden", v!=="home");
+  $("#view-history").classList.toggle("hidden", v!=="history");
+  $("#view-profile").classList.toggle("hidden", v!=="profile");
+  $("#date-nav").classList.toggle("hidden", v!=="home");
+  $("#fab-add").classList.toggle("hidden", v==="profile");
+  $("#head-hi").textContent = v==="profile" ? ("คุณ " + S.user.un) : greeting();
+  $("#head-date").textContent = fmtDateTH(v==="home" ? S.curDate : new Date());
+  if(v==="home") renderHome();
+  if(v==="history") renderHistory();
+  if(v==="profile") renderProfile();
+  window.scrollTo(0,0);
+}
+$$(".nav-btn").forEach(b => b.onclick = ()=>switchView(b.dataset.view));
+$("#date-prev").onclick = ()=>{ S.curDate.setDate(S.curDate.getDate()-1); switchView("home"); };
+$("#date-next").onclick = ()=>{ S.curDate.setDate(S.curDate.getDate()+1); switchView("home"); };
+$("#date-today").onclick = ()=>{ S.curDate = new Date(); switchView("home"); };
+
+/* ================= home ================= */
+function dayEntries(dk){ return getLog()[dk] || []; }
+function dayTotals(dk){
+  const t = {k:0,p:0,c:0,f:0,na:0,s:0};
+  dayEntries(dk).forEach(e => { t.k+=e.k*e.qty; t.p+=e.p*e.qty; t.c+=e.c*e.qty; t.f+=e.f*e.qty; t.na+=e.na*e.qty; t.s+=e.s*e.qty; });
+  return t;
+}
+function renderHome(){
+  const dk = dateKey(S.curDate);
+  const tot = dayTotals(dk);
+  const T = S.targets;
+  const eaten = Math.round(tot.k);
+  const left = T.kcal - eaten;
+  const frac = Math.min(1, eaten/T.kcal);
+  const C = 2*Math.PI*62;
+  const arc = 0.75*C;
+  const over = left < 0;
+  const isToday = dk === dateKey(new Date());
+  const entries = dayEntries(dk);
+
+  let msg;
+  if(eaten===0) msg = "ยังไม่บันทึกอะไรเลย เริ่มมื้อแรกกันเถอะ";
+  else if(over) msg = `เกินเป้ามา ${Math.abs(left).toLocaleString()} แคล ${isToday?"เย็นนี้เบา ๆ หน่อยนะ":""}`;
+  else if(left < T.kcal*0.25) msg = `ใกล้ครบเป้าแล้ว เหลือพื้นที่อีก ${left.toLocaleString()} แคล`;
+  else msg = `กินได้อีก ${left.toLocaleString()} แคล ตามแผน${T.goalLabel}`;
+
+  const macroRow = (name,val,max,unit,color) => {
+    const pc = Math.min(100, val/max*100);
+    const ov = val > max;
+    return `<div class="mac-row">
+      <span class="mac-name">${name}</span>
+      <span class="mac-bar"><i style="width:${pc}%;background:${ov?"var(--chili)":color}"></i></span>
+      <span class="mac-val${ov?" over":""}">${Math.round(val)}/${max} ${unit}</span>
+    </div>`;
+  };
+
+  const groups = ["b","l","d","s"].map(m => {
+    const es = entries.filter(e=>e.meal===m);
+    if(!es.length) return "";
+    const gk = Math.round(es.reduce((a,e)=>a+e.k*e.qty,0));
+    return `<div class="meal-group">
+      <div class="meal-head"><span class="sec-title">${MEAL_ICONS[m]} ${MEALS[m]}</span><span class="m-kcal">${gk.toLocaleString()} แคล</span></div>
+      ${es.map(e => `<div class="entry">
+        <span class="e-ico">${e.src==="photo"?"📷":e.src==="scan"?"🏷️":e.src==="ai"?"✨":"🍽️"}</span>
+        <span class="e-body"><span class="e-name">${esc(e.name)}</span><br/><span class="e-sub">${e.qty!==1?("×"+e.qty+" · "):""}${esc(e.portion||"")} · โปรตีน ${r1(e.p*e.qty)} ก.</span></span>
+        <span class="e-kcal">${Math.round(e.k*e.qty)}<small> แคล</small></span>
+        <button class="e-del" data-del="${e.id}" aria-label="ลบรายการ"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg></button>
+      </div>`).join("")}
+    </div>`;
+  }).join("");
+
+  $("#view-home").innerHTML = `
+    <div class="hero">
+      <div class="gauge-wrap">
+        <div class="gauge">
+          <svg width="150" height="150" viewBox="0 0 150 150">
+            <circle class="g-track" cx="75" cy="75" r="62" fill="none" stroke-width="11" stroke-linecap="round" stroke-dasharray="${arc} ${C}"/>
+            <circle class="g-fill${over?" over":""}" cx="75" cy="75" r="62" fill="none" stroke-width="11" stroke-linecap="round" stroke-dasharray="${frac*arc} ${C}"/>
+          </svg>
+          <div class="gauge-center">
+            <div class="g-num">${over?"+"+Math.abs(left).toLocaleString():left.toLocaleString()}</div>
+            <div class="g-lbl">${over?"แคลที่เกิน":"แคลที่กินได้อีก"}</div>
+          </div>
+        </div>
+        <div class="hero-side">
+          <div class="hs-row"><span>เป้าวันนี้</span><b>${T.kcal.toLocaleString()}</b></div>
+          <div class="hs-row"><span>กินแล้ว</span><b>${eaten.toLocaleString()}</b></div>
+          <div class="hs-row"><span>เป้าหมาย</span><b>${esc(T.goalLabel)}</b></div>
+        </div>
+      </div>
+      <div class="hero-msg">${msg}</div>
+    </div>
+    <div class="macros">
+      <h3>สารอาหารวันนี้</h3>
+      ${macroRow("โปรตีน",tot.p,T.protein,"ก.","var(--c-p)")}
+      ${macroRow("คาร์บ",tot.c,T.carb,"ก.","var(--c-c)")}
+      ${macroRow("ไขมัน",tot.f,T.fat,"ก.","var(--c-f)")}
+      <div class="limit-chips">
+        <div class="limit-chip${tot.na>T.sodium?" over":""}">โซเดียม<b>${Math.round(tot.na).toLocaleString()} / ${T.sodium.toLocaleString()} มก.</b></div>
+        <div class="limit-chip${tot.s>T.sugar?" over":""}">น้ำตาล<b>${r1(tot.s)} / ${T.sugar} ก.</b></div>
+      </div>
+    </div>
+    ${entries.length ? groups : `<div class="empty"><div class="big">🍚</div>ยังไม่มีรายการของ${isToday?"วันนี้":"วันนั้น"}<br/>กดปุ่ม <b style="color:var(--chili)">+</b> เพื่อเพิ่มมื้อแรก</div>`}
+  `;
+  $$("#view-home [data-del]").forEach(b => b.onclick = async ()=>{
+    const entry = entries.find(e=>e.id===b.dataset.del);
+    if(!(await askConfirm("ลบรายการนี้?", `"${entry?entry.name:""}" จะถูกลบออกจากบันทึก`, "ลบ"))) return;
+    const log = getLog();
+    log[dk] = (log[dk]||[]).filter(e=>e.id!==b.dataset.del);
+    if(!log[dk].length) delete log[dk];
+    saveLog(log); renderHome(); toast("ลบแล้ว");
+  });
+}
+
+/* ================= history ================= */
+function renderHistory(){
+  const T = S.targets, log = getLog(), N = S.histRange;
+  const days = [];
+  for(let i=N-1;i>=0;i--){
+    const d = new Date(); d.setDate(d.getDate()-i);
+    const dk = dateKey(d);
+    const tot = dayTotals(dk);
+    days.push({dk, d, k:Math.round(tot.k), has:(log[dk]||[]).length>0});
+  }
+  const maxK = Math.max(T.kcal*1.15, ...days.map(x=>x.k)) * 1.08;
+  const W=320,H=150,base=130;
+  const bw = N===7 ? 30 : 7.5, gap=(W-20)/N;
+  const bars = days.map((x,i)=>{
+    const h = x.k/maxK*(base-16);
+    const cx = 14+gap*i+gap/2;
+    const overT = x.k>T.kcal;
+    return `<rect x="${(cx-bw/2).toFixed(1)}" y="${(base-h).toFixed(1)}" width="${bw}" height="${Math.max(h,2).toFixed(1)}" rx="${Math.min(5,bw/2.5)}" fill="${x.k===0?"#EAF0EA":overT?"var(--chili)":"var(--green-mid)"}" opacity="${x.k===0?1:overT?.9:.92}"/>`
+      + (N===7?`<text x="${cx}" y="${H-4}" font-size="10" text-anchor="middle" fill="#8A978E" font-family="Prompt">${x.d.toLocaleDateString("th-TH",{weekday:"narrow"})}</text>`:"");
+  }).join("");
+  const ty = base - T.kcal/maxK*(base-16);
+  const withData = days.filter(x=>x.has);
+  const avg = withData.length ? Math.round(withData.reduce((a,x)=>a+x.k,0)/withData.length) : 0;
+  const okDays = withData.filter(x=>x.k<=T.kcal).length;
+
+  const dayRows = [...withData].reverse().map(x=>{
+    const over = x.k>T.kcal;
+    return `<button class="day-row" data-day="${x.dk}">
+      <span><span class="d-date">${fmtDateTH(x.d)}</span><br/><span class="d-sub">${dayEntries(x.dk).length} รายการ</span></span>
+      <span class="d-kcal${over?" over":""}">${x.k.toLocaleString()} แคล</span>
+    </button>`;
+  }).join("");
+
+  $("#view-history").innerHTML = `
+    <div class="chart-card">
+      <div class="seg">
+        <button data-r="7" class="${N===7?"on":""}">7 วัน</button>
+        <button data-r="30" class="${N===30?"on":""}">30 วัน</button>
+      </div>
+      <svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="กราฟแคลอรี่ย้อนหลัง">
+        <line x1="10" y1="${ty.toFixed(1)}" x2="${W-10}" y2="${ty.toFixed(1)}" stroke="var(--chili)" stroke-width="1.5" stroke-dasharray="5 4" opacity=".65"/>
+        <text x="${W-10}" y="${(ty-5).toFixed(1)}" font-size="10" text-anchor="end" fill="var(--chili)" font-family="Prompt">เป้า ${T.kcal.toLocaleString()}</text>
+        ${bars}
+      </svg>
+    </div>
+    <div class="stat-grid">
+      <div class="stat"><div class="s-val">${avg.toLocaleString()}</div><div class="s-lbl">แคลเฉลี่ย/วัน (${N} วัน)</div></div>
+      <div class="stat"><div class="s-val">${okDays}/${withData.length||0}</div><div class="s-lbl">วันที่อยู่ในเป้า</div></div>
+    </div>
+    <div style="margin-top:16px">${dayRows || `<div class="empty">ยังไม่มีข้อมูลย้อนหลัง<br/>เริ่มบันทึกวันนี้เลย</div>`}</div>
+  `;
+  $$("#view-history .seg button").forEach(b => b.onclick = ()=>{ S.histRange = +b.dataset.r; renderHistory(); });
+  $$("#view-history [data-day]").forEach(b => b.onclick = ()=>{
+    const [y,m,d] = b.dataset.day.split("-").map(Number);
+    S.curDate = new Date(y, m-1, d);
+    switchView("home");
+  });
+}
+
+/* ================= profile view ================= */
+function renderProfile(){
+  const pf = S.user.profile, T = S.targets;
+  const hasKey = !!getKey();
+  $("#view-profile").innerHTML = `
+    <div class="pf-card">
+      <h3>ข้อมูลร่างกาย</h3>
+      <div class="pf-row"><span>เพศ / อายุ</span><b>${pf.sex==="m"?"ชาย":"หญิง"} · ${pf.age} ปี</b></div>
+      <div class="pf-row"><span>น้ำหนัก / ส่วนสูง</span><b>${pf.weight} กก. · ${pf.height} ซม.</b></div>
+      <div class="pf-row"><span>กิจกรรม</span><b>${esc(ACTS[pf.act]||"")}</b></div>
+      <div class="pf-row"><span>เป้าหมาย</span><b>${esc(T.goalLabel)}</b></div>
+      <button class="btn btn-ghost" id="pf-edit" style="margin-top:12px">แก้ไขข้อมูล</button>
+    </div>
+    <div class="pf-card">
+      <h3>เป้าต่อวันที่คำนวณให้</h3>
+      <div class="pf-row"><span>เผาผลาญพื้นฐาน (BMR)</span><b>${T.bmr.toLocaleString()} แคล</b></div>
+      <div class="pf-row"><span>เผาผลาญรวมกิจกรรม (TDEE)</span><b>${T.tdee.toLocaleString()} แคล</b></div>
+      <div class="pf-row"><span>${T.adj>0?"บวกเพิ่ม":T.adj<0?"หักออก (deficit)":"ปรับ"}</span><b>${T.adj>0?"+":""}${T.adj} แคล</b></div>
+      <div class="pf-row"><span><b style="font-family:var(--font-body)">เป้ากินต่อวัน</b></span><b style="color:var(--green);font-size:1.15rem">${T.kcal.toLocaleString()} แคล</b></div>
+      <div class="pf-row"><span>โปรตีน / คาร์บ / ไขมัน</span><b>${T.protein} / ${T.carb} / ${T.fat} ก.</b></div>
+      <div class="pf-row"><span>โซเดียม / น้ำตาล ไม่เกิน</span><b>${T.sodium.toLocaleString()} มก. / ${T.sugar} ก.</b></div>
+    </div>
+    <div class="pf-card">
+      <h3>AI วิเคราะห์รูปอาหาร <span class="key-status ${hasKey?"ok":"no"}">${hasKey?"● พร้อมใช้":"● ยังไม่ได้ใส่ key"}</span></h3>
+      <div class="field">
+        <label for="gm-key">Gemini API Key (ฟรี)</label>
+        <input type="password" id="gm-key" placeholder="วาง key ที่นี่" value="${esc(getKey())}" autocomplete="off"/>
+        <div class="hint">key เก็บในเครื่องนี้เท่านั้น ใช้ตอนให้ AI ดูรูป/ข้อความ</div>
+      </div>
+      <button class="btn btn-primary" id="gm-save">บันทึก key</button>
+      <details class="howto">
+        <summary>วิธีขอ key ฟรี (2 นาที)</summary>
+        <ol>
+          <li>เข้า <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a></li>
+          <li>ล็อกอินบัญชี Google แล้วกด <b>Create API key</b></li>
+          <li>คัดลอก key มาวางในช่องด้านบน แล้วกดบันทึก</li>
+        </ol>
+      </details>
+    </div>
+    <div class="pf-card">
+      <button class="btn btn-ghost" id="pf-logout">ออกจากระบบ</button>
+      <button class="btn btn-danger" id="pf-wipe" style="margin-top:10px">ลบบัญชีและข้อมูลทั้งหมด</button>
+    </div>
+    <p style="text-align:center;color:var(--muted);font-size:.78rem;margin-top:4px">นับแคล · ตัวเลขเป็นค่าประมาณ ไม่ใช่คำแนะนำทางการแพทย์</p>
+  `;
+  $("#pf-edit").onclick = ()=>showSetup(true);
+  $("#gm-save").onclick = ()=>{
+    lsSet("nc_gemini_key", $("#gm-key").value.trim());
+    toast($("#gm-key").value.trim() ? "บันทึก key แล้ว ใช้ AI ได้เลย" : "ลบ key ออกแล้ว");
+    renderProfile();
+  };
+  $("#pf-logout").onclick = logout;
+  $("#pf-wipe").onclick = async ()=>{
+    if(!(await askConfirm("ลบทุกอย่าง?", "บัญชีนี้และบันทึกอาหารทั้งหมดจะหายถาวร กู้คืนไม่ได้", "ลบถาวร"))) return;
+    localStorage.removeItem(logKey());
+    saveUsers(getUsers().filter(u=>u.id!==S.user.id));
+    logout();
+    toast("ลบข้อมูลเรียบร้อย");
+  };
+}
+
+/* ================= add flows ================= */
+$("#fab-add").onclick = ()=>openSheet("#sheet-add");
+$("#opt-manual").onclick = ()=>{
+  closeSheet("#sheet-add"); openSheet("#sheet-manual");
+  $("#food-search").value = ""; renderFoodResults("");
+  setTimeout(()=>$("#food-search").focus(), 250);
+};
+$("#opt-photo").onclick = ()=>{
+  if(!getKey()){ closeAllSheets(); switchView("profile"); toast("ใส่ Gemini API key ก่อน ถึงจะใช้ AI ดูรูปได้ (ฟรี)"); return; }
+  $("#photo-input").click();
+};
+$("#opt-scan").onclick = ()=>{ closeSheet("#sheet-add"); openSheet("#sheet-scan"); startScan(); };
+
+/* --- manual search --- */
+function renderFoodResults(q){
+  q = q.trim();
+  const hits = (q ? FOOD_DB.filter(f=>f[0].includes(q)) : FOOD_DB.slice(0,10)).slice(0,12);
+  $("#food-results").innerHTML = hits.map((f,i)=>`
+    <button class="food-hit" data-i="${FOOD_DB.indexOf(f)}">
+      <span><span class="fh-n">${esc(f[0])}</span><br/><span class="fh-s">ต่อ 1 ${esc(f[1])} · โปรตีน ${f[3]} ก.</span></span>
+      <span class="fh-k">${f[2]} แคล</span>
+    </button>`).join("") || `<p style="color:var(--muted);font-size:.88rem;padding:6px 4px">ไม่เจอ "${esc(q)}" ในเมนูที่มี — ให้ AI ประเมินได้เลย</p>`;
+  const aiBtn = $("#ai-text-btn");
+  if(q.length>=3){ aiBtn.classList.remove("hidden"); $("#ai-text-q").textContent = q; } else aiBtn.classList.add("hidden");
+  $$("#food-results .food-hit").forEach(b => b.onclick = ()=>{
+    const f = FOOD_DB[+b.dataset.i];
+    closeSheet("#sheet-manual");
+    openConfirm([{name:f[0], portion:"1 "+f[1], k:f[2], p:f[3], c:f[4], f:f[5], na:f[6], s:f[7], qty:1, src:"db"}], "เพิ่มรายการนี้", "");
+  });
+}
+$("#food-search").addEventListener("input", e => renderFoodResults(e.target.value));
+$("#ai-text-btn").onclick = async ()=>{
+  const q = $("#food-search").value.trim();
+  if(!getKey()){ closeAllSheets(); switchView("profile"); toast("ใส่ Gemini API key ก่อน ถึงจะใช้ AI ได้ (ฟรี)"); return; }
+  closeSheet("#sheet-manual");
+  try{
+    showLoading("AI กำลังประเมิน “"+q+"”…");
+    const res = await geminiFood([{text:`ผู้ใช้บอกว่ากิน: "${q}"`}]);
+    hideLoading();
+    if(!res.items.length){ toast("AI อ่านแล้วไม่แน่ใจว่าเป็นอาหารอะไร ลองพิมพ์ละเอียดขึ้น เช่น ปริมาณ/ขนาด"); return; }
+    openConfirm(res.items, "AI ประเมินให้แล้ว", res.note||"");
+  }catch(err){ hideLoading(); toast(err.message); }
+};
+
+/* --- photo --- */
+$("#photo-input").addEventListener("change", async e => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if(!file) return;
+  closeAllSheets();
+  try{
+    showLoading("AI กำลังดูรูปอาหาร…");
+    const b64 = await downscale(file);
+    const res = await geminiFood([
+      {inline_data:{mime_type:"image/jpeg", data:b64}},
+      {text:"วิเคราะห์อาหาร/เครื่องดื่มทั้งหมดในรูปนี้"}
+    ]);
+    hideLoading();
+    if(!res.items.length){ toast(res.note || "AI มองไม่ออกว่าในรูปมีอาหารอะไร ลองถ่ายใกล้ขึ้นหรือให้แสงสว่างกว่านี้"); return; }
+    res.items.forEach(it=>it.src="photo");
+    openConfirm(res.items, "เจอสิ่งนี้ในรูป", res.note||"ตัวเลขเป็นค่าประมาณจากขนาดที่เห็นในรูป ปรับได้");
+  }catch(err){ hideLoading(); toast(err.message); }
+});
+function downscale(file){
+  return new Promise((res,rej)=>{
+    const img = new Image();
+    img.onload = ()=>{
+      const max = 1024;
+      const sc = Math.min(1, max/Math.max(img.width, img.height));
+      const cv = document.createElement("canvas");
+      cv.width = Math.round(img.width*sc); cv.height = Math.round(img.height*sc);
+      cv.getContext("2d").drawImage(img,0,0,cv.width,cv.height);
+      URL.revokeObjectURL(img.src);
+      res(cv.toDataURL("image/jpeg",0.85).split(",")[1]);
+    };
+    img.onerror = ()=>rej(new Error("เปิดรูปไม่ได้ ลองรูปอื่นนะ"));
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+/* --- Gemini --- */
+const GM_MODEL = "gemini-2.5-flash";
+async function geminiFood(parts){
+  const key = getKey();
+  if(!key) throw new Error("ยังไม่ได้ใส่ Gemini API key — ไปที่หน้าโปรไฟล์ก่อนนะ");
+  const sys = `คุณคือนักโภชนาการชาวไทย หน้าที่คือประเมินสารอาหารของอาหารที่ผู้ใช้กิน (ส่วนใหญ่เป็นอาหารไทย)
+- ระบุอาหาร/เครื่องดื่มแต่ละอย่างแยกรายการ ตั้งชื่อเป็นภาษาไทยสั้น ๆ
+- ประเมินปริมาณ (portion) ตามที่เห็นจริงหรือหน่วยไทยทั่วไป เช่น จาน ชาม ถ้วย ไม้ แก้ว
+- ให้ค่า kcal, protein_g, carb_g, fat_g, sodium_mg, sugar_g ต่อรายการ อย่างสมจริง
+- ถ้าไม่ใช่อาหารเลย ให้ items เป็น [] และอธิบายใน note สั้น ๆ`;
+  let resp;
+  try{
+    resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GM_MODEL}:generateContent?key=${encodeURIComponent(key)}`,{
+      method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({
+        system_instruction:{parts:[{text:sys}]},
+        contents:[{role:"user", parts}],
+        generationConfig:{
+          temperature:0.2,
+          response_mime_type:"application/json",
+          response_schema:{type:"OBJECT",properties:{
+            items:{type:"ARRAY",items:{type:"OBJECT",properties:{
+              name:{type:"STRING"},portion:{type:"STRING"},kcal:{type:"NUMBER"},protein_g:{type:"NUMBER"},
+              carb_g:{type:"NUMBER"},fat_g:{type:"NUMBER"},sodium_mg:{type:"NUMBER"},sugar_g:{type:"NUMBER"}
+            },required:["name","kcal","protein_g","carb_g","fat_g","sodium_mg","sugar_g"]}},
+            note:{type:"STRING"}
+          },required:["items"]}
+        }
+      })
+    });
+  }catch(e){ throw new Error("ต่ออินเทอร์เน็ตไม่ได้ ลองใหม่อีกครั้งนะ"); }
+  if(!resp.ok){
+    if(resp.status===400 || resp.status===403) throw new Error("API key ไม่ถูกต้องหรือหมดอายุ ลองสร้าง key ใหม่ที่ aistudio.google.com");
+    if(resp.status===429) throw new Error("ใช้ AI ถี่เกินโควต้าฟรีชั่วคราว รอสัก 1 นาทีแล้วลองใหม่");
+    throw new Error("AI ตอบกลับผิดพลาด ("+resp.status+") ลองใหม่อีกครั้ง");
+  }
+  const data = await resp.json();
+  const text = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0].text;
+  if(!text) throw new Error("AI ไม่ตอบกลับ ลองใหม่อีกครั้งนะ");
+  let out;
+  try{ out = JSON.parse(text); }catch(e){ throw new Error("AI ตอบมาอ่านไม่ได้ ลองใหม่อีกครั้ง"); }
+  const items = (out.items||[]).map(it=>({
+    name:String(it.name||"อาหาร"), portion:String(it.portion||""), qty:1, src:"ai",
+    k:Math.max(0,Math.round(+it.kcal||0)), p:r1(+it.protein_g||0), c:r1(+it.carb_g||0),
+    f:r1(+it.fat_g||0), na:Math.max(0,Math.round(+it.sodium_mg||0)), s:r1(+it.sugar_g||0)
+  }));
+  return {items, note:out.note||""};
+}
+
+/* --- barcode --- */
+async function startScan(){
+  const wrap = $("#scan-video-wrap");
+  const hasBD = "BarcodeDetector" in window;
+  if(!hasBD || !navigator.mediaDevices){
+    wrap.classList.add("hidden");
+    $("#scan-hint").textContent = "เครื่องนี้สแกนด้วยกล้องไม่ได้ พิมพ์ตัวเลขใต้บาร์โค้ดแทนได้เลย";
+    return;
+  }
+  try{
+    S.scanStream = await navigator.mediaDevices.getUserMedia({video:{facingMode:"environment"}});
+    const video = $("#scan-video");
+    video.srcObject = S.scanStream;
+    await video.play();
+    wrap.classList.remove("hidden");
+    $("#scan-hint").textContent = "เล็งบาร์โค้ดหลังซองให้อยู่กลางจอ";
+    const detector = new BarcodeDetector({formats:["ean_13","ean_8","upc_a","upc_e","code_128"]});
+    S.scanRun = true;
+    const loop = async ()=>{
+      if(!S.scanRun) return;
+      try{
+        const codes = await detector.detect(video);
+        if(codes.length){ const c = codes[0].rawValue; stopScan(); closeSheet("#sheet-scan"); lookupEAN(c); return; }
+      }catch(e){}
+      requestAnimationFrame(loop);
+    };
+    loop();
+  }catch(e){
+    wrap.classList.add("hidden");
+    $("#scan-hint").textContent = "เปิดกล้องไม่ได้ (ต้องอนุญาตกล้อง) — พิมพ์ตัวเลขใต้บาร์โค้ดแทนได้";
+  }
+}
+function stopScan(){
+  S.scanRun = false;
+  if(S.scanStream){ S.scanStream.getTracks().forEach(t=>t.stop()); S.scanStream = null; }
+  $("#scan-video").srcObject = null;
+}
+$("#ean-lookup").onclick = ()=>{
+  const code = $("#ean-input").value.replace(/\D/g,"");
+  if(code.length < 8){ toast("ตัวเลขบาร์โค้ดต้องมี 8–13 หลัก"); return; }
+  closeSheet("#sheet-scan"); lookupEAN(code);
+};
+async function lookupEAN(code){
+  showLoading("กำลังค้นหาสินค้า…");
+  try{
+    const resp = await fetch(`https://world.openfoodfacts.org/api/v2/product/${code}.json?fields=product_name,product_name_th,brands,nutriments,serving_quantity,serving_size,quantity`);
+    const data = await resp.json();
+    hideLoading();
+    if(data.status!==1 || !data.product){ toast("ไม่พบสินค้านี้ในฐานข้อมูล — ลองถ่ายรูปให้ AI ดู หรือพิมพ์เองแทน"); return; }
+    const pr = data.product, nu = pr.nutriments||{};
+    const per = (k)=>+nu[k+"_100g"]||0;
+    const servG = +pr.serving_quantity || 0;
+    const factor = servG ? servG/100 : 1;
+    const portion = servG ? `1 หน่วยบริโภค (${servG} ก.)` : "ต่อ 100 ก.";
+    const kcal100 = per("energy-kcal") || (per("energy")/4.184);
+    const item = {
+      name: (pr.product_name_th || pr.product_name || "สินค้า "+code) + (pr.brands?` (${pr.brands.split(",")[0]})`:""),
+      portion, qty:1, src:"scan",
+      k:Math.round(kcal100*factor), p:r1(per("proteins")*factor), c:r1(per("carbohydrates")*factor),
+      f:r1(per("fat")*factor), na:Math.round((per("sodium")*1000)*factor), s:r1(per("sugars")*factor)
+    };
+    if(!item.k && !item.p && !item.c){ toast("เจอสินค้าแต่ไม่มีข้อมูลสารอาหาร — ลองถ่ายรูปฉลากให้ AI ดูแทน"); return; }
+    openConfirm([item], "เจอสินค้าแล้ว", servG?"":"ค่าที่แสดงคือต่อ 100 กรัม/มล. ปรับจำนวนตามที่กินจริง");
+  }catch(e){ hideLoading(); toast("ค้นหาไม่สำเร็จ เช็คอินเทอร์เน็ตแล้วลองใหม่"); }
+}
+
+/* ================= confirm sheet ================= */
+function openConfirm(items, title, note){
+  S.pending = items;
+  S.pendingMeal = mealByHour(new Date().getHours());
+  $("#confirm-title").textContent = title;
+  $("#confirm-note").textContent = note;
+  renderConfirmItems();
+  $$("#meal-chips .chip").forEach(c => c.classList.toggle("on", c.dataset.v===S.pendingMeal));
+  openSheet("#sheet-confirm");
+}
+function renderConfirmItems(){
+  $("#confirm-items").innerHTML = S.pending.map((it,i)=>`
+    <div class="ci-item">
+      <div class="ci-top">
+        <div style="min-width:0">
+          <div class="ci-name">${esc(it.name)}</div>
+          <div class="ci-portion">${esc(it.portion||"")}</div>
+        </div>
+        <div class="qty">
+          <button type="button" data-q="-" data-i="${i}" aria-label="ลดจำนวน">−</button>
+          <span class="qv">×${it.qty}</span>
+          <button type="button" data-q="+" data-i="${i}" aria-label="เพิ่มจำนวน">+</button>
+        </div>
+      </div>
+      <div class="ci-nut">
+        <span><b>${Math.round(it.k*it.qty)}</b> แคล</span>
+        <span>โปรตีน <b>${r1(it.p*it.qty)}</b></span>
+        <span>คาร์บ <b>${r1(it.c*it.qty)}</b></span>
+        <span>ไขมัน <b>${r1(it.f*it.qty)}</b></span>
+        <span>โซเดียม <b>${Math.round(it.na*it.qty)}</b></span>
+        <span>น้ำตาล <b>${r1(it.s*it.qty)}</b></span>
+      </div>
+      ${S.pending.length>1?`<button class="ci-remove" data-rm="${i}" type="button">เอารายการนี้ออก</button>`:""}
+    </div>`).join("");
+  $$("#confirm-items [data-q]").forEach(b => b.onclick = ()=>{
+    const it = S.pending[+b.dataset.i];
+    it.qty = Math.max(0.5, Math.round((it.qty + (b.dataset.q==="+"?0.5:-0.5))*2)/2);
+    renderConfirmItems();
+  });
+  $$("#confirm-items [data-rm]").forEach(b => b.onclick = ()=>{ S.pending.splice(+b.dataset.rm,1); renderConfirmItems(); });
+}
+$("#meal-chips").addEventListener("click", e => {
+  const c = e.target.closest(".chip"); if(!c) return;
+  S.pendingMeal = c.dataset.v;
+  $$("#meal-chips .chip").forEach(x => x.classList.toggle("on", x===c));
+});
+$("#confirm-save").onclick = ()=>{
+  if(!S.pending.length){ closeSheet("#sheet-confirm"); return; }
+  const log = getLog();
+  const dk = dateKey(S.curDate);
+  log[dk] = log[dk] || [];
+  S.pending.forEach(it => log[dk].push({id:uid(), ts:Date.now(), meal:S.pendingMeal, ...it}));
+  saveLog(log);
+  const addK = Math.round(S.pending.reduce((a,it)=>a+it.k*it.qty,0));
+  closeSheet("#sheet-confirm");
+  S.pending = [];
+  switchView("home");
+  toast(`บันทึกแล้ว +${addK.toLocaleString()} แคล`);
+};
+
+/* ================= boot ================= */
+(function boot(){
+  const sid = lsGet("nc_session", null);
+  if(sid){
+    const user = getUsers().find(u=>u.id===sid);
+    if(user){ enter(user); return; }
+  }
+  $("#scr-auth").classList.remove("hidden");
+})();
+
+</script>
+</body>
+</html>
