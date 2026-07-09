@@ -1501,10 +1501,22 @@ const GM_MODEL = "gemini-2.5-flash";
 async function geminiFood(parts){
   const key = getKey();
   if(!key) throw new Error("ยังไม่ได้ใส่ Gemini API key — ไปที่หน้าโปรไฟล์ก่อนนะ");
-  const sys = `คุณคือนักโภชนาการชาวไทย หน้าที่คือประเมินสารอาหารของอาหารที่ผู้ใช้กิน (ส่วนใหญ่เป็นอาหารไทย)
-- ระบุอาหาร/เครื่องดื่มแต่ละอย่างแยกรายการ ตั้งชื่อเป็นภาษาไทยสั้น ๆ
-- ประเมินปริมาณ (portion) ตามที่เห็นจริงหรือหน่วยไทยทั่วไป เช่น จาน ชาม ถ้วย ไม้ แก้ว
-- ให้ค่า kcal, protein_g, carb_g, fat_g, sodium_mg, sugar_g ต่อรายการ อย่างสมจริง
+  const sys = `คุณคือนักโภชนาการคลินิกชาวไทยที่เข้มงวดเรื่องความแม่นยำสูงสุด อ้างอิงตารางคุณค่าทางโภชนาการอาหารไทย (Thai FCT) และ USDA เท่านั้น ห้ามเดากลม ๆ
+
+ขั้นตอนการวิเคราะห์ (คิดทีละขั้นก่อนตอบ):
+1) ระบุอาหาร/เครื่องดื่มแต่ละอย่างแยกรายการ ชื่อไทยสั้น ๆ
+2) กะน้ำหนักจริงเป็นกรัม/มล. จากขนาดที่เห็นในรูป (เทียบขนาดจาน ชาม ช้อน) → ใส่ใน portion_g
+3) คำนวณสารอาหาร = ส่วนประกอบจริงต่อ 100 ก. × (portion_g ÷ 100)
+
+กฎเหล็ก (ห้ามฝ่าฝืน):
+- ห้ามใส่ค่าที่อาหารนั้นไม่มีจริง: ของที่ไม่เติมน้ำตาล/ไม่มีคาร์บหวาน เช่น ไข่ต้ม เนื้อสัตว์ล้วน ปลานึ่ง กาแฟดำ น้ำเปล่า → sugar_g = 0
+- sugar_g ต้องไม่เกิน carb_g เด็ดขาด
+- kcal ต้องสอดคล้องกับ macro: kcal ≈ protein_g×4 + carb_g×4 + fat_g×9 (คลาดเคลื่อนได้ไม่เกิน ±10% ยกเว้นแอลกอฮอล์)
+- โซเดียมสูงได้เฉพาะของปรุงรส/แปรรูป/น้ำซุป — ผลไม้สด ของต้มเปล่า ไข่ต้ม โซเดียมต่ำมาก
+- ใช้ค่ากลางสมจริง ไม่ปัดขึ้นให้ดูเยอะ ไม่เผื่อเวอร์
+
+ค่าคาลิเบรต (ยึดเป็นมาตรฐาน): ไข่ต้ม 1 ฟอง = 75 kcal, P6, C0.5, F5, Na65, น้ำตาล 0 · ข้าวสวย 1 ทัพพี 80 ก. = 105 kcal · อกไก่ 100 ก. = 165 kcal, P31, F3.6 · กะเพราหมูราดข้าว+ไข่ดาว = 580–680 kcal · ชาเย็น 1 แก้ว = ~220 kcal น้ำตาล ~34 · ส้มตำไทย = ~120 kcal
+
 - ถ้ารูปเป็นฉลากโภชนาการหรือซองสินค้า ให้อ่านตัวเลขจากฉลากโดยตรง ใช้ค่าต่อ 1 หน่วยบริโภค และใช้ชื่อสินค้าบนซอง (บอกใน note ว่ากี่หน่วยบริโภคต่อซอง)
 - ถ้าไม่ใช่อาหารเลย ให้ items เป็น [] และอธิบายใน note สั้น ๆ`;
   let resp;
@@ -1515,13 +1527,13 @@ async function geminiFood(parts){
         system_instruction:{parts:[{text:sys}]},
         contents:[{role:"user", parts}],
         generationConfig:{
-          temperature:0.2,
+          temperature:0.1,
           response_mime_type:"application/json",
           response_schema:{type:"OBJECT",properties:{
             items:{type:"ARRAY",items:{type:"OBJECT",properties:{
-              name:{type:"STRING"},portion:{type:"STRING"},kcal:{type:"NUMBER"},protein_g:{type:"NUMBER"},
+              name:{type:"STRING"},portion:{type:"STRING"},portion_g:{type:"NUMBER"},kcal:{type:"NUMBER"},protein_g:{type:"NUMBER"},
               carb_g:{type:"NUMBER"},fat_g:{type:"NUMBER"},sodium_mg:{type:"NUMBER"},sugar_g:{type:"NUMBER"}
-            },required:["name","kcal","protein_g","carb_g","fat_g","sodium_mg","sugar_g"]}},
+            },required:["name","portion_g","kcal","protein_g","carb_g","fat_g","sodium_mg","sugar_g"]}},
             note:{type:"STRING"}
           },required:["items"]}
         }
@@ -1538,11 +1550,23 @@ async function geminiFood(parts){
   if(!text) throw new Error("AI ไม่ตอบกลับ ลองใหม่อีกครั้งนะ");
   let out;
   try{ out = JSON.parse(text); }catch(e){ throw new Error("AI ตอบมาอ่านไม่ได้ ลองใหม่อีกครั้ง"); }
-  const items = (out.items||[]).map(it=>({
-    name:String(it.name||"อาหาร"), portion:String(it.portion||""), qty:1, src:"ai",
-    k:Math.max(0,Math.round(+it.kcal||0)), p:r1(+it.protein_g||0), c:r1(+it.carb_g||0),
-    f:r1(+it.fat_g||0), na:Math.max(0,Math.round(+it.sodium_mg||0)), s:r1(+it.sugar_g||0)
-  }));
+  const items = (out.items||[]).map(it=>{
+    let k = Math.max(0, Math.round(+it.kcal||0));
+    const p = r1(Math.max(0, +it.protein_g||0));
+    const c = r1(Math.max(0, +it.carb_g||0));
+    const f = r1(Math.max(0, +it.fat_g||0));
+    const na = Math.max(0, Math.round(+it.sodium_mg||0));
+    let s = r1(Math.max(0, +it.sugar_g||0));
+    // ด่านตรวจความสมเหตุสมผล: น้ำตาลเกินคาร์บไม่ได้
+    if(s > c) s = c;
+    // แคลต้องใกล้เคียงสูตร P×4 + C×4 + F×9 — เพี้ยนเกิน 30% ให้ยึดค่าที่คำนวณจาก macro
+    const atwater = Math.round(p*4 + c*4 + f*9);
+    if(atwater >= 20 && Math.abs(k - atwater) > atwater*0.3) k = atwater;
+    const grams = +it.portion_g > 0 ? Math.round(+it.portion_g) : 0;
+    let portion = String(it.portion||"").trim();
+    if(grams && !/\d\s*(ก|กรัม|มล|g|ml)/i.test(portion)) portion = portion ? `${portion} (~${grams} ก.)` : `~${grams} ก.`;
+    return {name:String(it.name||"อาหาร"), portion, qty:1, src:"ai", k, p, c, f, na, s};
+  });
   return {items, note:out.note||""};
 }
 
