@@ -1497,53 +1497,79 @@ function downscale(file){
 }
 
 /* --- Gemini --- */
-const GM_MODEL = "gemini-2.5-flash";
+// ตัวแรกโควต้าเต็ม/ล่ม จะสลับไปตัวถัดไปให้อัตโนมัติ
+const GM_MODELS = ["gemini-2.5-flash", "gemini-2.0-flash"];
+// รายชื่อเมนูในฐานข้อมูล ส่งให้ AI ใช้จับคู่ — ค่าตัวเลขจะมาจากฐานข้อมูล ไม่ใช่ AI แต่งเอง
+const DB_REF = FOOD_DB.map(f => `${f[0]}|${f[1]}`).join("\n");
+/* หาเมนูในฐานข้อมูลจากชื่อที่ AI ตอบ — จับคู่แบบระวัง ไม่เดามั่ว */
+function findDB(name){
+  name = String(name||"").trim();
+  if(!name) return null;
+  let f = FOOD_DB.find(x => x[0] === name);
+  if(f) return f;
+  const flat = name.replace(/\s/g,"");
+  f = FOOD_DB.find(x => x[0].replace(/\s/g,"") === flat);
+  if(f) return f;
+  // ชื่อฐานข้อมูลที่มีชื่อจาก AI อยู่ข้างใน (เช่น "กะเพราไก่ไข่ดาว" → "ข้าวกะเพราไก่ไข่ดาว") ต้องเจอตัวเดียวเท่านั้นถึงใช้
+  if(name.length >= 4){
+    const hits = FOOD_DB.filter(x => x[0].includes(name));
+    if(hits.length === 1) return hits[0];
+  }
+  return null;
+}
 async function geminiFood(parts){
   const key = getKey();
   if(!key) throw new Error("ยังไม่ได้ใส่ Gemini API key — ไปที่หน้าโปรไฟล์ก่อนนะ");
-  const sys = `คุณคือนักโภชนาการคลินิกชาวไทยที่เข้มงวดเรื่องความแม่นยำสูงสุด อ้างอิงตารางคุณค่าทางโภชนาการอาหารไทย (Thai FCT) และ USDA เท่านั้น ห้ามเดากลม ๆ
+  const sys = `คุณคือนักโภชนาการคลินิกชาวไทยที่เข้มงวดเรื่องความแม่นยำสูงสุด ห้ามเดากลม ๆ
+
+ด้านล่างคือฐานข้อมูลอาหารไทยที่ตรวจสอบค่าแล้ว (รูปแบบ: ชื่อ|หน่วย):
+${DB_REF}
 
 ขั้นตอนการวิเคราะห์ (คิดทีละขั้นก่อนตอบ):
 1) ระบุอาหาร/เครื่องดื่มแต่ละอย่างแยกรายการ ชื่อไทยสั้น ๆ
-2) กะน้ำหนักจริงเป็นกรัม/มล. จากขนาดที่เห็นในรูป (เทียบขนาดจาน ชาม ช้อน) → ใส่ใน portion_g
-3) คำนวณสารอาหาร = ส่วนประกอบจริงต่อ 100 ก. × (portion_g ÷ 100)
+2) เทียบกับฐานข้อมูลก่อนเสมอ: ถ้าเป็นเมนูเดียวกันหรือใกล้เคียงมาก → ใส่ db_name เป็นชื่อจากฐานข้อมูลแบบตรงตัวอักษรเป๊ะ ๆ และ servings = จำนวนหน่วยที่กินเทียบกับหน่วยของเมนูนั้น (0.5, 1, 1.5, 2, ...) เช่น ไข่ต้ม 2 ฟอง → db_name "ไข่ต้ม" servings 2 · กะเพราจานใหญ่พิเศษ → servings 1.5
+3) ถ้าไม่มีเมนูใกล้เคียงในฐานข้อมูลจริง ๆ → db_name = "" (ว่าง)
+4) ไม่ว่ากรณีไหน ให้ประเมินค่าเองแนบมาด้วยเสมอ: กะน้ำหนักจริงเป็นกรัม/มล. จากขนาดที่เห็น → portion_g แล้วคำนวณสารอาหาร = ส่วนประกอบจริงต่อ 100 ก. (Thai FCT/USDA) × (portion_g ÷ 100)
 
-กฎเหล็ก (ห้ามฝ่าฝืน):
+กฎเหล็กตอนประเมินเอง (ห้ามฝ่าฝืน):
 - ห้ามใส่ค่าที่อาหารนั้นไม่มีจริง: ของที่ไม่เติมน้ำตาล/ไม่มีคาร์บหวาน เช่น ไข่ต้ม เนื้อสัตว์ล้วน ปลานึ่ง กาแฟดำ น้ำเปล่า → sugar_g = 0
 - sugar_g ต้องไม่เกิน carb_g เด็ดขาด
 - kcal ต้องสอดคล้องกับ macro: kcal ≈ protein_g×4 + carb_g×4 + fat_g×9 (คลาดเคลื่อนได้ไม่เกิน ±10% ยกเว้นแอลกอฮอล์)
 - โซเดียมสูงได้เฉพาะของปรุงรส/แปรรูป/น้ำซุป — ผลไม้สด ของต้มเปล่า ไข่ต้ม โซเดียมต่ำมาก
 - ใช้ค่ากลางสมจริง ไม่ปัดขึ้นให้ดูเยอะ ไม่เผื่อเวอร์
 
-ค่าคาลิเบรต (ยึดเป็นมาตรฐาน): ไข่ต้ม 1 ฟอง = 75 kcal, P6, C0.5, F5, Na65, น้ำตาล 0 · ข้าวสวย 1 ทัพพี 80 ก. = 105 kcal · อกไก่ 100 ก. = 165 kcal, P31, F3.6 · กะเพราหมูราดข้าว+ไข่ดาว = 580–680 kcal · ชาเย็น 1 แก้ว = ~220 kcal น้ำตาล ~34 · ส้มตำไทย = ~120 kcal
-
-- ถ้ารูปเป็นฉลากโภชนาการหรือซองสินค้า ให้อ่านตัวเลขจากฉลากโดยตรง ใช้ค่าต่อ 1 หน่วยบริโภค และใช้ชื่อสินค้าบนซอง (บอกใน note ว่ากี่หน่วยบริโภคต่อซอง)
+- ถ้ารูปเป็นฉลากโภชนาการหรือซองสินค้า ให้ db_name = "" แล้วอ่านตัวเลขจากฉลากโดยตรง ใช้ค่าต่อ 1 หน่วยบริโภค และใช้ชื่อสินค้าบนซอง (บอกใน note ว่ากี่หน่วยบริโภคต่อซอง)
 - ถ้าไม่ใช่อาหารเลย ให้ items เป็น [] และอธิบายใน note สั้น ๆ`;
-  let resp;
-  try{
-    resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GM_MODEL}:generateContent?key=${encodeURIComponent(key)}`,{
-      method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({
-        system_instruction:{parts:[{text:sys}]},
-        contents:[{role:"user", parts}],
-        generationConfig:{
-          temperature:0.1,
-          response_mime_type:"application/json",
-          response_schema:{type:"OBJECT",properties:{
-            items:{type:"ARRAY",items:{type:"OBJECT",properties:{
-              name:{type:"STRING"},portion:{type:"STRING"},portion_g:{type:"NUMBER"},kcal:{type:"NUMBER"},protein_g:{type:"NUMBER"},
-              carb_g:{type:"NUMBER"},fat_g:{type:"NUMBER"},sodium_mg:{type:"NUMBER"},sugar_g:{type:"NUMBER"}
-            },required:["name","portion_g","kcal","protein_g","carb_g","fat_g","sodium_mg","sugar_g"]}},
-            note:{type:"STRING"}
-          },required:["items"]}
-        }
-      })
-    });
-  }catch(e){ throw new Error("ต่ออินเทอร์เน็ตไม่ได้ ลองใหม่อีกครั้งนะ"); }
-  if(!resp.ok){
-    if(resp.status===400 || resp.status===403) throw new Error("API key ไม่ถูกต้องหรือหมดอายุ ลองสร้าง key ใหม่ที่ aistudio.google.com");
-    if(resp.status===429) throw new Error("ใช้ AI ถี่เกินโควต้าฟรีชั่วคราว รอสัก 1 นาทีแล้วลองใหม่");
-    throw new Error("AI ตอบกลับผิดพลาด ("+resp.status+") ลองใหม่อีกครั้ง");
+  const body = JSON.stringify({
+    system_instruction:{parts:[{text:sys}]},
+    contents:[{role:"user", parts}],
+    generationConfig:{
+      temperature:0.1,
+      response_mime_type:"application/json",
+      response_schema:{type:"OBJECT",properties:{
+        items:{type:"ARRAY",items:{type:"OBJECT",properties:{
+          name:{type:"STRING"},db_name:{type:"STRING"},servings:{type:"NUMBER"},
+          portion:{type:"STRING"},portion_g:{type:"NUMBER"},kcal:{type:"NUMBER"},protein_g:{type:"NUMBER"},
+          carb_g:{type:"NUMBER"},fat_g:{type:"NUMBER"},sodium_mg:{type:"NUMBER"},sugar_g:{type:"NUMBER"}
+        },required:["name","db_name","servings","portion_g","kcal","protein_g","carb_g","fat_g","sodium_mg","sugar_g"]}},
+        note:{type:"STRING"}
+      },required:["items"]}
+    }
+  });
+  let resp = null, lastStatus = 0;
+  for(const model of GM_MODELS){
+    try{
+      resp = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`,
+        {method:"POST", headers:{"Content-Type":"application/json"}, body});
+    }catch(e){ throw new Error("ต่ออินเทอร์เน็ตไม่ได้ ลองใหม่อีกครั้งนะ"); }
+    if(resp.ok) break;
+    lastStatus = resp.status;
+    if(lastStatus === 400 || lastStatus === 403) break; // ปัญหาที่ key ลองโมเดลอื่นก็ไม่ช่วย
+  }
+  if(!resp || !resp.ok){
+    if(lastStatus===400 || lastStatus===403) throw new Error("API key ไม่ถูกต้องหรือหมดอายุ ลองสร้าง key ใหม่ที่ aistudio.google.com");
+    if(lastStatus===429) throw new Error("ใช้ AI ถี่เกินโควต้าฟรีชั่วคราว รอสัก 1 นาทีแล้วลองใหม่");
+    throw new Error("AI ตอบกลับผิดพลาด ("+lastStatus+") ลองใหม่อีกครั้ง");
   }
   const data = await resp.json();
   const text = data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts && data.candidates[0].content.parts[0].text;
@@ -1551,6 +1577,14 @@ async function geminiFood(parts){
   let out;
   try{ out = JSON.parse(text); }catch(e){ throw new Error("AI ตอบมาอ่านไม่ได้ ลองใหม่อีกครั้ง"); }
   const items = (out.items||[]).map(it=>{
+    // จับคู่ฐานข้อมูลได้ → ใช้ค่าที่ตรวจสอบแล้ว AI มีหน้าที่แค่บอกว่าเมนูไหน กินกี่หน่วย
+    const dbf = findDB(it.db_name);
+    if(dbf){
+      let qty = Math.round((+it.servings || 1) * 2) / 2;
+      qty = Math.min(10, Math.max(0.5, qty));
+      return {name:dbf[0], portion:"1 "+dbf[1], qty, src:"ai", verified:true,
+        k:dbf[2], p:dbf[3], c:dbf[4], f:dbf[5], na:dbf[6], s:dbf[7]};
+    }
     let k = Math.max(0, Math.round(+it.kcal||0));
     const p = r1(Math.max(0, +it.protein_g||0));
     const c = r1(Math.max(0, +it.carb_g||0));
@@ -1702,7 +1736,7 @@ function renderConfirmItems(){
       <div class="ci-top">
         <div style="min-width:0">
           <div class="ci-name">${esc(it.name)||'<span style="color:var(--muted);font-weight:500">ยังไม่มีชื่อ — กรอกด้านล่าง</span>'}</div>
-          <div class="ci-portion">${esc(it.portion||"")}</div>
+          <div class="ci-portion">${esc(it.portion||"")}${it.verified?' · <span style="color:var(--green-mid);font-weight:700">✓ ตารางอาหารไทย</span>':""}</div>
         </div>
         <div class="qty">
           <button type="button" data-q="-" data-i="${i}" aria-label="ลดจำนวน">−</button>
@@ -1746,7 +1780,7 @@ function renderConfirmItems(){
     inp.addEventListener("input", ()=>{
       const it = S.pending[+inp.dataset.i], f = inp.dataset.f;
       if(f==="name" || f==="portion") it[f] = inp.value;
-      else it[f] = Math.max(0, parseFloat(inp.value) || 0);
+      else { it[f] = Math.max(0, parseFloat(inp.value) || 0); delete it.verified; }
     });
     inp.addEventListener("change", ()=>renderConfirmItems()); // refresh ตัวเลขสรุปตอนออกจากช่อง
   });
